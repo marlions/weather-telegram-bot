@@ -9,6 +9,7 @@ from sqlalchemy import select
 from .config import settings
 from .db import engine, async_session_maker
 from .models import Base, User
+from .weather_client import get_current_weather, format_weather_message
 
 async def cmd_start(message: Message):
     async with async_session_maker() as session:
@@ -36,6 +37,12 @@ async def cmd_start(message: Message):
         "/unsubscribe - отписаться\n"
         "/current - текущая погода"
     )
+
+async def cmd_current(message: Message):
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
 
 async def cmd_set_city(message: Message):
     # парсим /set_city Город
