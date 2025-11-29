@@ -28,3 +28,5 @@ class Subscription(Base):
 
     def __repr__(self):
         return f"<Subscription(id={self.id}, user_id={self.user_id}, city={self.city})>"
+
+User.subscriptions = relationship("Subscription", order_by=Subscription.id, back_populates="user")
