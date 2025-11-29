@@ -215,8 +215,12 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
     dp.message.register(cmd_current, Command(commands=["current"]))
+    dp.message.register(subscribe_daily, Command(commands=["subscribe_daily"]))
+    dp.message.register(unsubscribe_daily, Command(commands=["unsubscribe"]))
     dp.message.register(btn_current, F.text == "Текущая погода")
     dp.message.register(btn_set_city, F.text == "Сменить город")
+    dp.message.register(subscribe_daily, F.text == "Подписаться на прогноз")
+    dp.message.register(unsubscribe_daily, F.text == "Отписаться от прогноза")
     dp.message.register(process_city, CityForm.waiting_for_city)
 
 async def main():
