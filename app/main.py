@@ -23,7 +23,6 @@ async def cmd_start(message: Message):
             )
             session.add(user)
         else:
-            # Обновим username, если вдруг изменился
             user.username = message.from_user.username
 
         await session.commit()
@@ -47,7 +46,24 @@ async def cmd_set_city(message: Message):
 
     city = parts[1].strip()
 
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
 
+        if user is None:
+            user = User(
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                city=city,
+            )
+            session.add(user)
+        else:
+            user.city = city
+
+        await session.commit()
+
+    await message.answer(f"Окей, буду слать погоду для города: <b>{city}</b>", parse_mode="HTML")
 
 
 
