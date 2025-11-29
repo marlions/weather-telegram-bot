@@ -4,12 +4,18 @@ import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.memory import MemoryStorage
 from sqlalchemy import select
 
 from .config import settings
 from .db import engine, async_session_maker
 from .models import Base, User
 from .weather_client import get_current_weather, format_weather_message
+
+class CityForm(StatesGroup):
+    waiting_for_city = State()
 
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
