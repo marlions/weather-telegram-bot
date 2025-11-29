@@ -193,6 +193,14 @@ async def unsubscribe_daily(message: Message):
             select(User).where(User.telegram_id == message.from_user.id)
         )
 
+        if user is None:
+            await message.answer("Я вас ещё не знаю. Напишите /start.")
+            return
+
+        sub = await session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
+
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
