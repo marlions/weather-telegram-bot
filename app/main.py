@@ -57,30 +57,35 @@ async def btn_set_city(message: Message, state: FSMContext):
     )
 
 async def cmd_start(message: Message):
-    async with async_session_maker() as session:
-        user = await session.scalar(
-            select(User).where(User.telegram_id == message.from_user.id)
-        )
-
-        if user is None:
-            user = User(
-                telegram_id=message.from_user.id,
-                username=message.from_user.username,
+    try:
+        logger.info(f"User start: {message.from_user.id} / {message.from_user.username}")
+        async with async_session_maker() as session:
+            user = await session.scalar(
+                select(User).where(User.telegram_id == message.from_user.id)
             )
-            session.add(user)
-        else:
-            user.username = message.from_user.username
 
-        await session.commit()
+            if user is None:
+                user = User(
+                    telegram_id=message.from_user.id,
+                    username=message.from_user.username,
+                )
+                session.add(user)
+            else:
+                user.username = message.from_user.username
 
-    await message.answer(
-        "Привет! Я бот для уведомлений о погоде 🌤\n\n"
-        "Можешь пользоваться командами или кнопками ниже.\n\n"
-        "Доступные действия:\n"
-        "• Текущая погода\n"
-        "• Сменить город",
-        reply_markup=main_menu_keyboard(),
-    )
+            await message.answer(
+                "Привет! Я бот для уведомлений о погоде 🌤\n\n"
+                "Можешь пользоваться командами или кнопками ниже.\n\n"
+                "Доступные действия:\n"
+                "• Текущая погода\n"
+                "• Сменить город",
+                reply_markup=main_menu_keyboard(),
+            )
+            await session.commit()
+        logger.info(f"/start handled successfully for {message.from_user.id}")
+    except Exception as e:
+        logger.exception(f"Error in /start handler for user {message.from_user.id}: {e}")
+        await message.answer("Произошла ошибка, попробуйте позже.")
 
 async def cmd_current(message: Message):
     async with async_session_maker() as session:
@@ -98,41 +103,48 @@ async def cmd_current(message: Message):
     city = user.city
 
     try:
+        logger.info(f"Fetching weather for {city} for user {message.from_user.id}")
         data = await get_current_weather(city)
+        text = format_weather_message(city, data)
+        await message.answer(text, parse_mode="HTML")
+
+        logger.info(f"Successfully sent weather for {city} to user {message.from_user.id}")
     except Exception as e:
+        logger.exception(f"Error fetching weather for {city} for user {message.from_user.id}: {e}")
         await message.answer(f"Не получилось получить погоду: {e}")
-        return
 
-    text = format_weather_message(city, data)
-    await message.answer(text, parse_mode="HTML")
+async def cmd_set_city(message: Message, new_city=None):
+    try:
+        logger.info(f"Setting city for user {message.from_user.id}: {new_city}")
+        parts = message.text.split(maxsplit=1)
+        if len(parts) < 2:
+            await message.answer("Использование: /set_city <город>\nНапример: /set_city Санкт-Петербург")
+            return
 
-async def cmd_set_city(message: Message):
-    # парсим /set_city Город
-    parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        await message.answer("Использование: /set_city <город>\nНапример: /set_city Санкт-Петербург")
-        return
+        city = parts[1].strip()
 
-    city = parts[1].strip()
-
-    async with async_session_maker() as session:
-        user = await session.scalar(
-            select(User).where(User.telegram_id == message.from_user.id)
-        )
-
-        if user is None:
-            user = User(
-                telegram_id=message.from_user.id,
-                username=message.from_user.username,
-                city=city,
+        async with async_session_maker() as session:
+            user = await session.scalar(
+                select(User).where(User.telegram_id == message.from_user.id)
             )
-            session.add(user)
-        else:
-            user.city = city
 
-        await session.commit()
+            if user is None:
+                user = User(
+                    telegram_id=message.from_user.id,
+                    username=message.from_user.username,
+                    city=city,
+                )
+                session.add(user)
+            else:
+                user.city = city
 
-    await message.answer(f"Окей, буду слать погоду для города: <b>{city}</b>", parse_mode="HTML")
+            await session.commit()
+
+        await message.answer(f"Окей, буду слать погоду для города: <b>{city}</b>", parse_mode="HTML")
+        logger.info(f"City for user {message.from_user.id} set to {city}")
+    except Exception as e:
+        logger.exception(f"Error in /set_city for user {message.from_user.id}: {e}")
+        await message.answer("Не удалось сохранить город.")
 
 async def process_city(message: Message, state: FSMContext):
     city = message.text.strip()
@@ -203,6 +215,9 @@ async def subscribe_daily(message: Message):
         parse_mode="HTML",
     )
 
+    logger.info(f"User {message.from_user.id} subscribed to daily weather updates for {user.city}")
+
+
 async def unsubscribe_daily(message: Message):
     async with async_session_maker() as session:
         user = await session.scalar(
@@ -228,51 +243,54 @@ async def unsubscribe_daily(message: Message):
     await message.answer("Вы отписались от ежедневных уведомлений о погоде.")
 
 async def send_daily_weather(bot: Bot):
-    # Получаем всех пользователей с активной подпиской и заданным городом
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(User, Subscription)
-            .join(Subscription, Subscription.user_id == User.id)
-            .where(
-                Subscription.daily_notifications == True,
-                User.city.isnot(None),
+    try:
+        logger.info("Starting daily weather broadcast")
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(User, Subscription)
+                .join(Subscription, Subscription.user_id == User.id)
+                .where(
+                    Subscription.daily_notifications == True,
+                    User.city.isnot(None),
+                )
             )
-        )
-        rows = result.all()
+            rows = result.all()
 
-    if not rows:
-        return
+        if not rows:
+            return
 
-    users_by_city: dict[str, list[int]] = {}
+        users_by_city: dict[str, list[int]] = {}
 
-    for user, sub in rows:
-        city = user.city or sub.city
-        if not city:
-            continue
-        users_by_city.setdefault(city, []).append(user.telegram_id)
+        for user, sub in rows:
+            city = user.city or sub.city
+            if not city:
+                continue
+            users_by_city.setdefault(city, []).append(user.telegram_id)
 
-    for city, chat_ids in users_by_city.items():
-        try:
-            data = await get_current_weather(city)
-            daily_text = "Ежедневный прогноз 🌤\n\n" + format_weather_message(city, data)
-            alert_text = check_extreme_weather(data)
-        except Exception as e:
-            logging.exception(f"Не удалось получить погоду для города {city}: {e}")
-            continue
-
-        for chat_id in chat_ids:
+        for city, chat_ids in users_by_city.items():
             try:
-                await bot.send_message(chat_id, daily_text, parse_mode="HTML")
+                data = await get_current_weather(city)
+                daily_text = "Ежедневный прогноз 🌤\n\n" + format_weather_message(city, data)
+                alert_text = check_extreme_weather(data)
             except Exception as e:
-                logging.exception(f"Не удалось отправить ежедневный прогноз пользователю {chat_id}: {e}")
+                logger.exception(f"Не удалось получить погоду для города {city}: {e}")
+                continue
 
-        if alert_text:
             for chat_id in chat_ids:
                 try:
-                    await bot.send_message(chat_id, alert_text, parse_mode="HTML")
+                    await bot.send_message(chat_id, daily_text, parse_mode="HTML")
                 except Exception as e:
-                    logging.exception(f"Не удалось отправить экстренное предупреждение пользователю {chat_id}: {e}")
+                    logger.exception(f"Не удалось отправить ежедневный прогноз пользователю {chat_id}: {e}")
 
+            if alert_text:
+                for chat_id in chat_ids:
+                    try:
+                        await bot.send_message(chat_id, alert_text, parse_mode="HTML")
+                    except Exception as e:
+                        logger.exception(f"Не удалось отправить экстренное предупреждение пользователю {chat_id}: {e}")
+        logger.info("Daily weather broadcast succeeded")
+    except Exception as e:
+        logger.exception(f"Error in daily weather broadcast: {e}")
 
 async def cmd_help(message: Message):
     help_text = """
