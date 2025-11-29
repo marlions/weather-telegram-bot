@@ -40,3 +40,29 @@ async def test_daily_weather_flow(monkeypatch):
         )
         session.add(sub)
         await session.commit()
+
+    async def fake_get_current_weather(city: str):
+        return {
+            "main": {
+                "temp": -22.0,
+                "feels_like": -25.0,
+                "humidity": 80,
+            },
+            "wind": {"speed": 10.0},
+            "weather": [{"description": "сильный снегопад"}],
+        }
+
+    import app.main as main_module
+    monkeypatch.setattr(main_module, "get_current_weather", fake_get_current_weather)
+
+    fake_bot = FakeBot()
+
+    await send_daily_weather(fake_bot)
+
+    msgs = [m for m in fake_bot.messages if m["chat_id"] == 123456]
+    assert msgs, "Должны быть отправлены сообщения подписчику"
+
+    text_all = "\n---\n".join(m["text"] for m in msgs)
+
+    assert "Ежедневный прогноз" in text_all
+    assert ("Экстренное предупреждение" in text_all) or ("⚠️" in text_all)
