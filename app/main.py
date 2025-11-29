@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from .config import settings
 from .db import engine, async_session_maker
-from .models import Base, User
+from .models import Base, User, Subscription
 from .weather_client import get_current_weather, format_weather_message
 
 class CityForm(StatesGroup):
@@ -148,6 +148,12 @@ async def process_city(message: Message, state: FSMContext):
         parse_mode="HTML",
         reply_markup=main_menu_keyboard(),
     )
+
+async def subscribe_daily(message: Message):
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
 
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
