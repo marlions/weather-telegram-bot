@@ -45,7 +45,6 @@ def check_extreme_weather(data: Dict[str, Any]) -> str | None:
     for r in reasons:
         text_lines.append(f"• {r}")
 
-    # Можно дать лёгкие рекомендации
     text_lines.append("")
     text_lines.append("Рекомендуется быть осторожнее и по возможности ограничить время на улице.")
 

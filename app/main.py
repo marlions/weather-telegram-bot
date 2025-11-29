@@ -259,6 +259,7 @@ async def send_daily_weather(bot: Bot):
                 except Exception as e:
                     logging.exception(f"Не удалось отправить экстренное предупреждение пользователю {chat_id}: {e}")
 
+
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
