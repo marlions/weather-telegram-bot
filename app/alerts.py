@@ -33,3 +33,20 @@ def check_extreme_weather(data: Dict[str, Any]) -> str | None:
     storm_keywords = ["гроза", "шторм", "буря", "snowstorm", "thunderstorm"]
     if any(word in description for word in storm_keywords):
         reasons.append("штормовые погодные условия")
+
+    if not reasons:
+        return None
+
+    text_lines = [
+        "⚠️ <b>Экстренное предупреждение о погоде</b>",
+        "",
+        "Обнаружены опасные погодные условия:",
+    ]
+    for r in reasons:
+        text_lines.append(f"• {r}")
+
+    # Можно дать лёгкие рекомендации
+    text_lines.append("")
+    text_lines.append("Рекомендуется быть осторожнее и по возможности ограничить время на улице.")
+
+    return "\n".join(text_lines)
