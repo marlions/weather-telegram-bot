@@ -65,16 +65,9 @@ async def cmd_set_city(message: Message):
 
     await message.answer(f"Окей, буду слать погоду для города: <b>{city}</b>", parse_mode="HTML")
 
-
-
-
-
-
-
-
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
-
+    dp.message.register(cmd_set_city, Command(commands=["set_city"]))
 
 async def main():
     logging.basicConfig(level=logging.INFO)
