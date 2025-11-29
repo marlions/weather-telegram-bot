@@ -22,6 +22,8 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text="Текущая погода")],
             [KeyboardButton(text="Сменить город")],
+            [KeyboardButton(text="Подписаться на прогноз")],
+            [KeyboardButton(text="Отписаться от прогноза")],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие…",
