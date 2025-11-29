@@ -154,6 +154,15 @@ async def subscribe_daily(message: Message):
         user = await session.scalar(
             select(User).where(User.telegram_id == message.from_user.id)
         )
+        if user is None:
+            await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
+            return
+
+        if not user.city:
+            await message.answer(
+                "Сначала задайте город через кнопку «Сменить город» или команду /set_city."
+            )
+            return
 
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
