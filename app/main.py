@@ -1,8 +1,8 @@
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart, Command, Text
+from aiogram import Bot, Dispatcher, F
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from sqlalchemy import select
 
@@ -113,6 +113,9 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
     dp.message.register(cmd_current, Command(commands=["current"]))
+    dp.message.register(btn_current, F.text == "Текущая погода")
+    dp.message.register(btn_set_city, F.text == "Сменить город")
+
 
 async def main():
     logging.basicConfig(level=logging.INFO)
