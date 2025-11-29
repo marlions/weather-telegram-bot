@@ -224,6 +224,11 @@ async def send_daily_weather(bot: Bot):
         )
         rows = result.all()
 
+    if not rows:
+        return
+
+    users_by_city: dict[str, list[int]] = {}
+
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
