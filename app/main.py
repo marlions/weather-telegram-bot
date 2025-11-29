@@ -37,7 +37,6 @@ async def btn_set_city(message: Message, state: FSMContext):
         "Например: <code>Санкт-Петербург</code> или <code>London</code>",
         parse_mode="HTML",
     )
-)
 
 async def cmd_start(message: Message):
     async with async_session_maker() as session:
@@ -123,7 +122,30 @@ async def process_city(message: Message, state: FSMContext):
         await message.answer("Название города не должно быть пустым. Попробуйте ещё раз.")
         return
 
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
 
+        if user is None:
+            user = User(
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                city=city,
+            )
+            session.add(user)
+        else:
+            user.city = city
+
+        await session.commit()
+
+    await state.clear()
+
+    await message.answer(
+        f"Город обновлён на: <b>{city}</b>",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
+    )
 
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
