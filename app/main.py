@@ -20,12 +20,14 @@ from .alerts import check_extreme_weather
 if not os.path.exists("logs"):
     os.makedirs("logs")
 
+log_path = os.path.join(os.getcwd(), 'logs', 'app.log')
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("logs/app.log")
+        logging.FileHandler(log_path)
     ]
 )
 logger = logging.getLogger(__name__)
