@@ -22,3 +22,14 @@ def check_extreme_weather(data: Dict[str, Any]) -> str | None:
             reasons.append("очень сильная жара")
         elif temp >= 30:
             reasons.append("жара")
+
+    if feels is not None:
+        if feels <= -25:
+            reasons.append("экстремально низкая температура по ощущениям")
+
+    if wind_speed is not None and wind_speed >= 15:
+        reasons.append("очень сильный ветер")
+
+    storm_keywords = ["гроза", "шторм", "буря", "snowstorm", "thunderstorm"]
+    if any(word in description for word in storm_keywords):
+        reasons.append("штормовые погодные условия")
