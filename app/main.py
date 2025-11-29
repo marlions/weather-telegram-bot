@@ -201,6 +201,16 @@ async def unsubscribe_daily(message: Message):
             select(Subscription).where(Subscription.user_id == user.id)
         )
 
+        if sub is None or not sub.daily_notifications:
+            await message.answer("Вы и так не подписаны на ежедневный прогноз.")
+            return
+
+        sub.daily_notifications = False
+        user.subscribed = False
+        await session.commit()
+
+    await message.answer("Вы отписались от ежедневных уведомлений о погоде.")
+
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
