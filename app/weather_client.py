@@ -14,3 +14,15 @@ async def get_current_weather(city: str) -> Dict[str, Any]:
         "units": "metric",
         "lang": "ru",
     }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            resp = await client.get("https://api.openweathermap.org/data/2.5/weather", params=params)
+        except httpx.RequestError as e:
+            raise WeatherClientError(f"Ошибка сети при запросе погоды: {e}") from e
+
+    if resp.status_code == 404:
+        raise WeatherClientError("Город не найден, проверьте написание")
+    if resp.status_code != 200:
+        raise WeatherClientError(f"Сервис погоды вернул ошибку: {resp.status_code} {resp.text}")
+
+    return resp.json()
