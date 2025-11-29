@@ -93,6 +93,7 @@ async def cmd_set_city(message: Message):
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
+    dp.message.register(cmd_current, Command(commands=["current"]))
 
 async def main():
     logging.basicConfig(level=logging.INFO)
