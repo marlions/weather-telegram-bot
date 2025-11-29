@@ -43,6 +43,13 @@ async def cmd_current(message: Message):
         user = await session.scalar(
             select(User).where(User.telegram_id == message.from_user.id)
         )
+    if user is None:
+        await message.answer("Я ещё не знаю, кто ты. Напиши сначала /start.")
+        return
+
+    if not user.city:
+        await message.answer("Сначала задай город командой:\n/set_city <город>")
+        return
 
 async def cmd_set_city(message: Message):
     # парсим /set_city Город
