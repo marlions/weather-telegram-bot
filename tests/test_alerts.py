@@ -32,3 +32,29 @@ def test_check_extreme_weather_detects_severe_frost():
             {"description": "ясно"},
         ],
     }
+    result = check_extreme_weather(data)
+
+    assert result is not None, "Для сильного мороза должно быть предупреждение"
+    assert "мороз" in result.lower() or "низкая температура" in result.lower()
+
+def test_check_extreme_weather_detects_storm_and_wind():
+    data = {
+        "main": {
+            "temp": 5.0,
+            "feels_like": 0.0,
+            "humidity": 90,
+        },
+        "wind": {
+            "speed": 18.0,
+        },
+        "weather": [
+            {"description": "гроза и штормовой ветер"},
+        ],
+    }
+
+    result = check_extreme_weather(data)
+
+    assert result is not None
+    text_lower = result.lower()
+    assert "ветер" in text_lower or "шторм" in text_lower
+    assert "⚠️" in result
