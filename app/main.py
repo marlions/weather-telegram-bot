@@ -2,14 +2,32 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
+from sqlalchemy import select
 
 from .config import settings
-from .db import engine
-from .models import Base
+from .db import engine, async_session_maker
+from .models import Base, User
 
 async def cmd_start(message: Message):
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+
+        if user is None:
+            user = User(
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+            )
+            session.add(user)
+        else:
+            # Обновим username, если вдруг изменился
+            user.username = message.from_user.username
+
+        await session.commit()
+
     await message.answer(
         "Привет! Я бот для уведомлений о погоде 🌤\n\n"
         "Пока я умею только здороваться, "
