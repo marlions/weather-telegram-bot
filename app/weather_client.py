@@ -43,3 +43,14 @@ def format_weather_message(city: str, data: Dict[str, Any]) -> str:
         "",
         f"{description.capitalize()}",
     ]
+
+    if temp is not None:
+        parts.append(f"Температура: <b>{temp:.1f}°C</b>")
+    if feels is not None:
+        parts.append(f"Ощущается как: {feels:.1f}°C")
+    if humidity is not None:
+        parts.append(f"Влажность: {humidity}%")
+    if wind_speed is not None:
+        parts.append(f"Ветер: {wind_speed} м/с")
+
+    return "\n".join(parts)
