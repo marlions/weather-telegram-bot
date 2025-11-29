@@ -153,7 +153,7 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_current, Command(commands=["current"]))
     dp.message.register(btn_current, F.text == "Текущая погода")
     dp.message.register(btn_set_city, F.text == "Сменить город")
-
+    dp.message.register(process_city, CityForm.waiting_for_city)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
@@ -162,7 +162,7 @@ async def main():
         raise RuntimeError("TELEGRAM_BOT_TOKEN не задан в переменных окружения")
 
     bot = Bot(token=settings.telegram_bot_token)
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
 
     setup_handlers(dp)
 
