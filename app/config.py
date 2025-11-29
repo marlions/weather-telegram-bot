@@ -9,6 +9,7 @@ class Settings:
     postgres_db: str
     postgres_host: str
     postgres_port: str
+    openweather_api_key: str
 
 def get_settings() -> Settings:
     return Settings(
@@ -18,6 +19,7 @@ def get_settings() -> Settings:
         postgres_db=os.getenv("POSTGRES_DB", "weather_db"),
         postgres_host=os.getenv("POSTGRES_HOST", "weather-postgres"),
         postgres_port=os.getenv("POSTGRES_PORT", "5432"),
+        openweather_api_key=os.getenv("OPENWEATHER_API_KEY", ""),
     )
 
 settings = get_settings()
