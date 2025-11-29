@@ -36,8 +36,8 @@ async def main():
 
     setup_handlers(dp)
 
-    async with engine.begin():
-        await engine.run_sync(Base.metadata.create_all)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
     await dp.start_polling(bot)
 
