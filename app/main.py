@@ -164,6 +164,29 @@ async def subscribe_daily(message: Message):
             )
             return
 
+        sub = await session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
+
+        if sub is None:
+            sub = Subscription(
+                user_id=user.id,
+                city=user.city,
+                daily_notifications=True,
+            )
+            session.add(sub)
+        else:
+            sub.city = user.city
+            sub.daily_notifications = True
+
+        user.subscribed = True
+        await session.commit()
+
+    await message.answer(
+        f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤",
+        parse_mode="HTML",
+    )
+
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
