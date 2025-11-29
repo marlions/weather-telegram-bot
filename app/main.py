@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
@@ -15,6 +16,19 @@ from .db import engine, async_session_maker
 from .models import Base, User, Subscription
 from .weather_client import get_current_weather, format_weather_message
 from .alerts import check_extreme_weather
+
+if not os.path.exists("logs"):
+    os.makedirs("logs")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("logs/app.log")
+    ]
+)
+logger = logging.getLogger(__name__)
 
 class CityForm(StatesGroup):
     waiting_for_city = State()
@@ -260,12 +274,29 @@ async def send_daily_weather(bot: Bot):
                     logging.exception(f"Не удалось отправить экстренное предупреждение пользователю {chat_id}: {e}")
 
 
+async def cmd_help(message: Message):
+    help_text = """
+    Привет! Я бот для получения прогноза погоды. Вот что я могу:
+
+    - /current — Текущая погода в выбранном городе.
+    - /set_city <город> — Установить город для прогнозов.
+    - Подписка на ежедневные прогнозы (через кнопки).
+    - Экстренные уведомления при критичных погодных условиях.
+
+    Просто нажмите кнопку или введите команду.
+    """
+    await message.answer(help_text)
+
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
     dp.message.register(cmd_current, Command(commands=["current"]))
     dp.message.register(subscribe_daily, Command(commands=["subscribe_daily"]))
     dp.message.register(unsubscribe_daily, Command(commands=["unsubscribe"]))
+    dp.message.register(cmd_help, Command(commands=["help"]))
     dp.message.register(btn_current, F.text == "Текущая погода")
     dp.message.register(btn_set_city, F.text == "Сменить город")
     dp.message.register(subscribe_daily, F.text == "Подписаться на прогноз")
