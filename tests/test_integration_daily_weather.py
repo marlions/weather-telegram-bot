@@ -14,3 +14,12 @@ class FakeBot:
         self.messages.append(
             {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
         )
+@pytest.mark.asyncio
+async def test_daily_weather_flow(monkeypatch):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with async_session_maker() as session:
+        await session.execute(delete(Subscription))
+        await session.execute(delete(User))
+        await session.commit()
