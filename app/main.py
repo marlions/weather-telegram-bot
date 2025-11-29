@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart, Command, Text
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from sqlalchemy import select
 
@@ -19,6 +19,16 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие…",
+    )
+
+async def btn_current(message: Message):
+    await cmd_current(message)
+
+async def btn_set_city(message: Message):
+    await message.answer(
+        "Введите город в формате:\n"
+        "<code>/set_city Санкт-Петербург</code>",
+        parse_mode="HTML",
     )
 
 async def cmd_start(message: Message):
