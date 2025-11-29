@@ -30,12 +30,14 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
 async def btn_current(message: Message):
     await cmd_current(message)
 
-async def btn_set_city(message: Message):
+async def btn_set_city(message: Message, state: FSMContext):
+    await state.set_state(CityForm.waiting_for_city)
     await message.answer(
-        "Введите город в формате:\n"
-        "<code>/set_city Санкт-Петербург</code>",
+        "Введите новый город.\n\n"
+        "Например: <code>Санкт-Петербург</code> или <code>London</code>",
         parse_mode="HTML",
     )
+)
 
 async def cmd_start(message: Message):
     async with async_session_maker() as session:
@@ -114,6 +116,14 @@ async def cmd_set_city(message: Message):
         await session.commit()
 
     await message.answer(f"Окей, буду слать погоду для города: <b>{city}</b>", parse_mode="HTML")
+
+async def process_city(message: Message, state: FSMContext):
+    city = message.text.strip()
+    if not city:
+        await message.answer("Название города не должно быть пустым. Попробуйте ещё раз.")
+        return
+
+
 
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
