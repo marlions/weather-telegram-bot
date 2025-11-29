@@ -3,13 +3,23 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from sqlalchemy import select
 
 from .config import settings
 from .db import engine, async_session_maker
 from .models import Base, User
 from .weather_client import get_current_weather, format_weather_message
+
+def main_menu_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Текущая погода")],
+            [KeyboardButton(text="Сменить город")],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите действие…",
+    )
 
 async def cmd_start(message: Message):
     async with async_session_maker() as session:
