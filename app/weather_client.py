@@ -37,3 +37,9 @@ def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     humidity = main.get("humidity")
     description = weather_list[0]["description"] if weather_list else "нет данных"
     wind_speed = wind.get("speed")
+
+    parts = [
+        f"Погода в городе <b>{city}</b> 🌤",
+        "",
+        f"{description.capitalize()}",
+    ]
