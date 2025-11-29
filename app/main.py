@@ -14,6 +14,7 @@ from .config import settings
 from .db import engine, async_session_maker
 from .models import Base, User, Subscription
 from .weather_client import get_current_weather, format_weather_message
+from .alerts import check_extreme_weather
 
 class CityForm(StatesGroup):
     waiting_for_city = State()
@@ -213,6 +214,7 @@ async def unsubscribe_daily(message: Message):
     await message.answer("Вы отписались от ежедневных уведомлений о погоде.")
 
 async def send_daily_weather(bot: Bot):
+    # Получаем всех пользователей с активной подпиской и заданным городом
     async with async_session_maker() as session:
         result = await session.execute(
             select(User, Subscription)
@@ -238,16 +240,24 @@ async def send_daily_weather(bot: Bot):
     for city, chat_ids in users_by_city.items():
         try:
             data = await get_current_weather(city)
-            text = "Ежедневный прогноз 🌤\n\n" + format_weather_message(city, data)
+            daily_text = "Ежедневный прогноз 🌤\n\n" + format_weather_message(city, data)
+            alert_text = check_extreme_weather(data)
         except Exception as e:
             logging.exception(f"Не удалось получить погоду для города {city}: {e}")
             continue
 
         for chat_id in chat_ids:
             try:
-                await bot.send_message(chat_id, text, parse_mode="HTML")
+                await bot.send_message(chat_id, daily_text, parse_mode="HTML")
             except Exception as e:
-                logging.exception(f"Не удалось отправить сообщение пользователю {chat_id}: {e}")
+                logging.exception(f"Не удалось отправить ежедневный прогноз пользователю {chat_id}: {e}")
+
+        if alert_text:
+            for chat_id in chat_ids:
+                try:
+                    await bot.send_message(chat_id, alert_text, parse_mode="HTML")
+                except Exception as e:
+                    logging.exception(f"Не удалось отправить экстренное предупреждение пользователю {chat_id}: {e}")
 
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
