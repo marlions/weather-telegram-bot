@@ -286,6 +286,7 @@ async def main():
         id="daily_weather_job",
         replace_existing=True,
     )
+    scheduler.add_job(send_daily_weather, "interval", minutes=1, args=[bot])
     scheduler.start()
 
     try:
