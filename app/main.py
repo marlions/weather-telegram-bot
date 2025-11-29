@@ -38,6 +38,23 @@ async def cmd_start(message: Message):
         "/current - текущая погода"
     )
 
+async def cmd_set_city(message: Message):
+    # парсим /set_city Город
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer("Использование: /set_city <город>\nНапример: /set_city Санкт-Петербург")
+        return
+
+    city = parts[1].strip()
+
+
+
+
+
+
+
+
+
 
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
