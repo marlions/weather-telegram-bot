@@ -187,6 +187,12 @@ async def subscribe_daily(message: Message):
         parse_mode="HTML",
     )
 
+async def unsubscribe_daily(message: Message):
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
