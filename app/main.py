@@ -51,6 +51,17 @@ async def cmd_current(message: Message):
         await message.answer("Сначала задай город командой:\n/set_city <город>")
         return
 
+    city = user.city
+
+    try:
+        data = await get_current_weather(city)
+    except Exception as e:
+        await message.answer(f"Не получилось получить погоду: {e}")
+        return
+
+    text = format_weather_message(city, data)
+    await message.answer(text, parse_mode="HTML")
+
 async def cmd_set_city(message: Message):
     # парсим /set_city Город
     parts = message.text.split(maxsplit=1)
