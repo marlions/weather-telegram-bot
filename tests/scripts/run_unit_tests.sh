@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -e
 
-echo "===> Building and starting services (bot + postgres)..."
-docker compose up --build
+echo "===> Running unit tests inside bot container..."
+docker compose run --rm bot pytest tests
