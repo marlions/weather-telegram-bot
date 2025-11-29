@@ -26,3 +26,14 @@ async def get_current_weather(city: str) -> Dict[str, Any]:
         raise WeatherClientError(f"Сервис погоды вернул ошибку: {resp.status_code} {resp.text}")
 
     return resp.json()
+
+def format_weather_message(city: str, data: Dict[str, Any]) -> str:
+    main = data.get("main", {})
+    weather_list = data.get("weather", [])
+    wind = data.get("wind", {})
+
+    temp = main.get("temp")
+    feels = main.get("feels_like")
+    humidity = main.get("humidity")
+    description = weather_list[0]["description"] if weather_list else "нет данных"
+    wind_speed = wind.get("speed")
