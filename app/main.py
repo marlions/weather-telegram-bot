@@ -229,6 +229,26 @@ async def send_daily_weather(bot: Bot):
 
     users_by_city: dict[str, list[int]] = {}
 
+    for user, sub in rows:
+        city = user.city or sub.city
+        if not city:
+            continue
+        users_by_city.setdefault(city, []).append(user.telegram_id)
+
+    for city, chat_ids in users_by_city.items():
+        try:
+            data = await get_current_weather(city)
+            text = "Ежедневный прогноз 🌤\n\n" + format_weather_message(city, data)
+        except Exception as e:
+            logging.exception(f"Не удалось получить погоду для города {city}: {e}")
+            continue
+
+        for chat_id in chat_ids:
+            try:
+                await bot.send_message(chat_id, text, parse_mode="HTML")
+            except Exception as e:
+                logging.exception(f"Не удалось отправить сообщение пользователю {chat_id}: {e}")
+
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
