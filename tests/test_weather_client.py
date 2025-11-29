@@ -29,3 +29,13 @@ def test_format_weather_message_basic():
 
     assert "Влажность: 94%" in text
     assert "Ветер: 5.0 м/с" in text
+
+def test_format_weather_message_handles_missing_fields():
+    city = "Тестоград"
+    data = {
+        "weather": [],
+    }
+
+    text = format_weather_message(city, data)
+    assert city in text
+    assert "Температура" not in text
