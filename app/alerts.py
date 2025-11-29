@@ -12,3 +12,13 @@ def check_extreme_weather(data: Dict[str, Any]) -> str | None:
                    if weather_list else "").lower()
 
     reasons: list[str] = []
+
+    if temp is not None:
+        if temp <= -20:
+            reasons.append("очень сильный мороз")
+        elif temp <= -15:
+            reasons.append("сильный мороз")
+        elif temp >= 35:
+            reasons.append("очень сильная жара")
+        elif temp >= 30:
+            reasons.append("жара")
