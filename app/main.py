@@ -6,7 +6,8 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 from .config import settings
-
+from .db import engine
+from .models import Base
 
 async def cmd_start(message: Message):
     await message.answer(
@@ -28,19 +29,17 @@ async def main():
     logging.basicConfig(level=logging.INFO)
 
     if not settings.telegram_bot_token:
-        raise RuntimeError(
-            "TELEGRAM_BOT_TOKEN не задан в переменных окружения. "
-            "Установи его перед запуском бота."
-        )
+        raise RuntimeError("TELEGRAM_BOT_TOKEN не задан в переменных окружения")
 
     bot = Bot(token=settings.telegram_bot_token)
     dp = Dispatcher()
 
     setup_handlers(dp)
 
+    async with engine.begin():
+        await engine.run_sync(Base.metadata.create_all)
 
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
