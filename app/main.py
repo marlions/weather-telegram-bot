@@ -8,6 +8,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from sqlalchemy import select
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from .config import settings
 from .db import engine, async_session_maker
@@ -210,6 +211,18 @@ async def unsubscribe_daily(message: Message):
         await session.commit()
 
     await message.answer("Вы отписались от ежедневных уведомлений о погоде.")
+
+async def send_daily_weather(bot: Bot):
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(User, Subscription)
+            .join(Subscription, Subscription.user_id == User.id)
+            .where(
+                Subscription.daily_notifications == True,
+                User.city.isnot(None),
+            )
+        )
+        rows = result.all()
 
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
