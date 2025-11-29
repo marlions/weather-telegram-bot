@@ -286,8 +286,12 @@ async def main():
         id="daily_weather_job",
         replace_existing=True,
     )
+    scheduler.start()
 
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        scheduler.shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
