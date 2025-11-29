@@ -275,6 +275,18 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    scheduler = AsyncIOScheduler(timezone="UTC")
+
+    scheduler.add_job(
+        send_daily_weather,
+        "cron",
+        hour=6,
+        minute=0,
+        args=[bot],
+        id="daily_weather_job",
+        replace_existing=True,
+    )
+
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
