@@ -1,10 +1,6 @@
 import pytest
-from sqlalchemy import delete
-
-from app.db import async_session_maker, engine
-from app.models import Base, User, Subscription
+from app.models import User, Subscription
 from app.main import send_daily_weather
-
 
 class FakeBot:
     def __init__(self):
@@ -14,6 +10,35 @@ class FakeBot:
         self.messages.append(
             {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
         )
+class FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+
+class FakeSession:
+    def __init__(self, rows):
+        self._rows = rows
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def execute(self, *args, **kwargs):
+        return FakeResult(self._rows)
+
+
+class FakeSessionMaker:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def __call__(self):
+        return FakeSession(self._rows)
+
 @pytest.mark.asyncio
 async def test_daily_weather_flow(monkeypatch):
     async with engine.begin() as conn:
