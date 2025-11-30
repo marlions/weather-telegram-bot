@@ -41,18 +41,24 @@ logger = logging.getLogger(__name__)
 
 class CityForm(StatesGroup):
     waiting_for_city = State()
-
+class ForecastForm(StatesGroup):
+    waiting_for_day = State()
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Текущая погода")],
+            [KeyboardButton(text="Текущая погода"), KeyboardButton(text="Погода на неделю")],
+            [KeyboardButton(text="Погода на другой день")],
             [KeyboardButton(text="Сменить город")],
-            [KeyboardButton(text="Подписаться на прогноз")],
-            [KeyboardButton(text="Отписаться от прогноза")],
+            [
+                KeyboardButton(text="Подписаться на прогноз"),
+                KeyboardButton(text="Отписаться от прогноза"),
+            ],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие…",
     )
+
+
 
 async def btn_current(message: Message):
     await cmd_current(message)
