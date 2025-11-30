@@ -190,6 +190,22 @@ async def cmd_current(message: Message):
         logger.exception(f"Error fetching weather for {city} for user {message.from_user.id}: {e}")
         await message.answer(f"Не получилось получить погоду: {e}")
 
+async def process_forecast_day(message: Message, state: FSMContext):
+    choice = message.text.strip()
+
+    if choice == "⬅️ Назад":
+        await state.clear()
+        await message.answer(
+            "Вернул кнопку в главное меню.", reply_markup=main_menu_keyboard()
+        )
+        return
+
+    if not choice.isdigit():
+        await message.answer(
+            "Пожалуйста, выберите число от 2 до 7.", reply_markup=forecast_day_keyboard()
+        )
+        return
+
 async def cmd_set_city(message: Message, new_city=None):
     try:
         logger.info(f"Setting city for user {message.from_user.id}: {new_city}")
