@@ -73,3 +73,21 @@ async def test_weather_api_error():
     with patch("httpx.AsyncClient", mock_async_client(response)):
         with pytest.raises(WeatherClientError):
             await get_current_weather("Saint Petersburg")
+
+@pytest.mark.asyncio
+async def test_request_error_handled(monkeypatch):
+    request = httpx.Request("GET", "https://api.openweathermap.org/data/2.5/weather")
+
+    class ErrorAsyncClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, *args, **kwargs):
+            raise httpx.RequestError("connection failed", request=request)
+
+    with patch("httpx.AsyncClient", lambda *args, **kwargs: ErrorAsyncClient()):
+        with pytest.raises(WeatherClientError):
+            await get_current_weather("Saint Petersburg")
