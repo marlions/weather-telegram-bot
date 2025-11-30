@@ -61,6 +61,21 @@ async def _get_city_coordinates(city: str) -> Tuple[float, float]:
 
     return float(lat), float(lon)
 
+async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]], int]:
+    if days < 1 or days > 7:
+        raise ValueError("Количество дней должно быть в диапазоне 1-7")
+
+    lat, lon = await _get_city_coordinates(city)
+
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "exclude": "minutely,hourly,alerts",
+        "units": "metric",
+        "lang": "ru",
+        "appid": settings.openweather_api_key,
+    }
+
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
     weather_list = data.get("weather", [])
