@@ -10,13 +10,13 @@ class FakeBot:
         self.messages.append(
             {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
         )
+
 class FakeResult:
     def __init__(self, rows):
         self._rows = rows
 
     def all(self):
         return self._rows
-
 
 class FakeSession:
     def __init__(self, rows):
@@ -30,7 +30,6 @@ class FakeSession:
 
     async def execute(self, *args, **kwargs):
         return FakeResult(self._rows)
-
 
 class FakeSessionMaker:
     def __init__(self, rows):
@@ -84,3 +83,5 @@ async def test_daily_weather_flow(monkeypatch):
 
     assert "Ежедневный прогноз" in text_all
     assert ("Экстренное предупреждение" in text_all) or ("⚠️" in text_all)
+    assert "Температура: <b>-22.0°C</b>" in text_all
+    assert "Ощущается как: <b>-25.0°C</b>" in text_all
