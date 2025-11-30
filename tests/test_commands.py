@@ -13,3 +13,10 @@ class FakeSelect:
 
     def join(self, *args, **kwargs):
         return self
+
+class FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
