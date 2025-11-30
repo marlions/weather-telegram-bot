@@ -1,4 +1,5 @@
-from typing import Any, Dict
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Tuple
 import httpx
 from .config import settings
 
@@ -26,6 +27,16 @@ async def get_current_weather(city: str) -> Dict[str, Any]:
         raise WeatherClientError(f"Сервис погоды вернул ошибку: {resp.status_code} {resp.text}")
 
     return resp.json()
+
+async def _get_city_coordinates(city: str) -> Tuple[float, float]:
+    if not settings.openweather_api_key:
+        raise WeatherClientError("API-ключ OpenWeatherMap не настроен")
+
+    params = {
+        "q": city,
+        "limit": 1,
+        "appid": settings.openweather_api_key,
+    }
 
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
