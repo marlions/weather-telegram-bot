@@ -1,7 +1,7 @@
 from app.weather_client import get_current_weather, WeatherClientError
 from unittest.mock import patch
 import pytest
-from aiohttp import ClientResponseError
+from httpx import HTTPStatusError, Response
 
 @pytest.mark.asyncio
 async def test_valid_city():
@@ -25,8 +25,8 @@ async def test_invalid_city():
 
 @pytest.mark.asyncio
 async def test_weather_api_error():
-    with patch('app.weather_client.get_current_weather', side_effect=ClientResponseError(
-        request_info=None, code=404, message="Not Found")):
+    with patch('app.weather_client.get_current_weather', side_effect=HTTPStatusError(
+            "Not Found", request=None, response=Response(status_code=404))):
         city = "Saint Petersburg"
-        with pytest.raises(ClientResponseError):
+        with pytest.raises(HTTPStatusError):
             await get_current_weather(city)
