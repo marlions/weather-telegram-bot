@@ -53,9 +53,8 @@ async def _get_city_coordinates(city: str) -> Tuple[float, float]:
         )
 
     data = resp.json()
-    forecast_list = data.get("list")
-    if not forecast_list:
-        raise WeatherClientError("Погодные данные недоступны для выбранного города")
+    if not data:
+        raise WeatherClientError("Город не найден, попробуйте уточнить запрос")
 
     lat = data[0].get("lat")
     lon = data[0].get("lon")
