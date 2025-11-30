@@ -165,7 +165,11 @@ async def process_city(message: Message, state: FSMContext):
     if not city:
         await message.answer("Название города не должно быть пустым. Попробуйте ещё раз.")
         return
-
+    try:
+        await get_current_weather(city)
+    except Exception as e:
+        await message.answer(f"Не удалось найти город: {city}. Проверьте правильность написания.")
+        return
     async with async_session_maker() as session:
         user = await session.scalar(
             select(User).where(User.telegram_id == message.from_user.id)
