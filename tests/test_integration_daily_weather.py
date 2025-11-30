@@ -41,30 +41,18 @@ class FakeSessionMaker:
 
 @pytest.mark.asyncio
 async def test_daily_weather_flow(monkeypatch):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    async with async_session_maker() as session:
-        await session.execute(delete(Subscription))
-        await session.execute(delete(User))
-        await session.commit()
-
-        user = User(
-            telegram_id=123456,
-            username="testuser",
-            city="Тестоград",
-            subscribed=True,
-        )
-        session.add(user)
-        await session.flush()
-
-        sub = Subscription(
-            user_id=user.id,
-            city=user.city,
-            daily_notifications=True,
-        )
-        session.add(sub)
-        await session.commit()
+    user = User(
+        id=1,
+        telegram_id=123456,
+        username="testuser",
+        city="Тестоград",
+        subscribed=True,
+    )
+    sub = Subscription(
+        user_id=user.id,
+        city=user.city,
+        daily_notifications=True,
+    )
 
     async def fake_get_current_weather(city: str):
         return {
