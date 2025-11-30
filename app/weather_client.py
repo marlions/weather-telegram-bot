@@ -103,6 +103,31 @@ def _format_date(timestamp: int, timezone_offset: int) -> str:
     dt = datetime.fromtimestamp(timestamp + timezone_offset, tz=timezone.utc)
     return dt.strftime("%d %b")
 
+def _format_daily_block(day: Dict[str, Any], timezone_offset: int, day_index: int) -> str:
+    date_str = _format_date(day.get("dt"), timezone_offset)
+    description = day.get("weather", [{}])[0].get("description", "нет данных").capitalize()
+    temp = day.get("temp", {})
+    temp_day = temp.get("day")
+    temp_night = temp.get("night")
+    feels_like = day.get("feels_like", {}).get("day")
+    wind_speed = day.get("wind_speed")
+    humidity = day.get("humidity")
+
+    parts = [f"{day_index}-й день ({date_str}): {description}"]
+
+    if temp_day is not None:
+        parts.append(f"Днём: <b>{temp_day:.1f}°C</b>")
+    if temp_night is not None:
+        parts.append(f"Ночью: <b>{temp_night:.1f}°C</b>")
+    if feels_like is not None:
+        parts.append(f"Ощущается как: <b>{feels_like:.1f}°C</b>")
+    if humidity is not None:
+        parts.append(f"Влажность: {humidity}%")
+    if wind_speed is not None:
+        parts.append(f"Ветер: {wind_speed} м/с")
+
+    return "\n".join(parts)
+
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
     weather_list = data.get("weather", [])
