@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from collections import Counter, defaultdict
+from datetime import datetime, timezone, date
 from typing import Any, Dict, List, Tuple
 import httpx
 from .config import settings
@@ -6,9 +7,12 @@ from .config import settings
 class WeatherClientError(Exception):
     pass
 
-async def get_current_weather(city: str) -> Dict[str, Any]:
+def _ensure_api_key():
     if not settings.openweather_api_key:
         raise WeatherClientError("API-ключ OpenWeatherMap не настроен")
+
+async def get_current_weather(city: str) -> Dict[str, Any]:
+    _ensure_api_key()
     params = {
         "q": city,
         "appid": settings.openweather_api_key,
@@ -29,8 +33,7 @@ async def get_current_weather(city: str) -> Dict[str, Any]:
     return resp.json()
 
 async def _get_city_coordinates(city: str) -> Tuple[float, float]:
-    if not settings.openweather_api_key:
-        raise WeatherClientError("API-ключ OpenWeatherMap не настроен")
+    _ensure_api_key()
 
     params = {
         "q": city,
@@ -50,8 +53,9 @@ async def _get_city_coordinates(city: str) -> Tuple[float, float]:
         )
 
     data = resp.json()
-    if not data:
-        raise WeatherClientError("Город не найден, проверьте написание")
+    forecast_list = data.get("list")
+    if not forecast_list:
+        raise WeatherClientError("Погодные данные недоступны для выбранного города")
 
     lat = data[0].get("lat")
     lon = data[0].get("lon")
@@ -61,16 +65,54 @@ async def _get_city_coordinates(city: str) -> Tuple[float, float]:
 
     return float(lat), float(lon)
 
+def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dict[str, Any]:
+    temps = [item.get("main", {}).get("temp") for item in entries if item.get("main")]
+    temp_mins = [item["main"].get("temp_min") for item in entries if item.get("main")]
+    temp_maxs = [item["main"].get("temp_max") for item in entries if item.get("main")]
+    feels_like = [
+        item.get("main", {}).get("feels_like") for item in entries if item.get("main")
+    ]
+    humidity = [
+        item.get("main", {}).get("humidity") for item in entries if item.get("main")
+    ]
+    wind_speeds = [item.get("wind", {}).get("speed") for item in entries if item.get("wind")]
+    descriptions: List[str] = []
+    for item in entries:
+        for weather in item.get("weather", []):
+            desc = weather.get("description")
+            if desc:
+                descriptions.append(desc)
+
+    dt = datetime.fromtimestamp(entries[0]["dt"] + timezone_offset, tz=timezone.utc)
+
+    def _safe_avg(values: List[float]) -> float | None:
+        filtered = [v for v in values if v is not None]
+        if not filtered:
+            return None
+        return sum(filtered) / len(filtered)
+
+    return {
+        "date": dt.date(),
+        "temp_min": min(temp_mins) if temp_mins else None,
+        "temp_max": max(temp_maxs) if temp_maxs else None,
+        "temp_avg": _safe_avg(temps),
+        "feels_like_avg": _safe_avg(feels_like),
+        "wind_speed_avg": _safe_avg(wind_speeds),
+        "humidity_avg": _safe_avg(humidity),
+        "description": Counter(descriptions).most_common(1)[0][0]
+        if descriptions
+        else "нет данных",
+    }
+
 async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]], int]:
-    if days < 1 or days > 7:
-        raise ValueError("Количество дней должно быть в диапазоне 1-7")
+    if days < 1 or days > 5:
+        raise ValueError("Количество дней должно быть в диапазоне 1-5")
 
     lat, lon = await _get_city_coordinates(city)
 
     params = {
         "lat": lat,
         "lon": lon,
-        "exclude": "minutely,hourly,alerts",
         "units": "metric",
         "lang": "ru",
         "appid": settings.openweather_api_key,
@@ -78,13 +120,15 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            resp = await client.get("https://api.openweathermap.org/data/2.5/onecall", params=params)
+            resp = await client.get("https://api.openweathermap.org/data/2.5/forecast", params=params)
         except httpx.RequestError as e:
             raise WeatherClientError(f"Ошибка сети при запросе прогноза: {e}") from e
 
+    if resp.status_code == 404:
+        raise WeatherClientError("Город не найден, проверьте написание")
     if resp.status_code == 401:
         raise WeatherClientError(
-            "API-ключ OpenWeatherMap недействителен или не имеет доступа к One Call. Проверьте настройку OPENWEATHER_API_KEY."
+            "API-ключ OpenWeatherMap недействителен."
         )
 
     if resp.status_code != 200:
@@ -93,57 +137,52 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
         )
 
     data = resp.json()
-    daily = data.get("daily")
-    if not daily:
+    list_data = data.get("list")
+    if not list_data:
         raise WeatherClientError("Погодные данные недоступны для выбранного города")
 
-    timezone_offset = data.get("timezone_offset", 0)
+    timezone_offset = data.get("city", {}).get("timezone", 0)
+    grouped: defaultdict[date, List[Dict[str, Any]]] = defaultdict(list)
 
-    return daily[:days], timezone_offset
+    for item in forecast_list:
+        dt = datetime.fromtimestamp(item["dt"] + timezone_offset, tz=timezone.utc)
+        grouped[dt.date()].append(item)
 
-def _format_date(timestamp: int, timezone_offset: int) -> str:
-    if timestamp is None:
-        return ""
+    sorted_dates = sorted(grouped.keys())
+    aggregated = [_aggregate_daily(grouped[day], timezone_offset) for day in sorted_dates]
 
-    dt = datetime.fromtimestamp(timestamp + timezone_offset, tz=timezone.utc)
-    return dt.strftime("%d %b")
+    return aggregated[:days], timezone_offset
 
-def _format_daily_block(day: Dict[str, Any], timezone_offset: int, day_index: int) -> str:
-    date_str = _format_date(day.get("dt"), timezone_offset)
-    description = day.get("weather", [{}])[0].get("description", "нет данных").capitalize()
-    temp = day.get("temp", {})
-    temp_day = temp.get("day")
-    temp_night = temp.get("night")
-    feels_like = day.get("feels_like", {}).get("day")
-    wind_speed = day.get("wind_speed")
-    humidity = day.get("humidity")
+def _format_date(day: date) -> str:
+    return day.strftime("%d %b")
+
+def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
+    date_str = _format_date(day.get("date")) if day.get("date") else ""
+    description = day.get("description", "нет данных").capitalize()
+    temp_min = day.get("temp_min")
+    temp_max = day.get("temp_max")
+    temp_avg = day.get("temp_avg")
+    feels_like = day.get("feels_like_avg")
+    wind_speed = day.get("wind_speed_avg")
+    humidity = day.get("humidity_avg")
 
     parts = [f"{day_index}-й день ({date_str}): {description}"]
 
-    if temp_day is not None:
-        parts.append(f"Днём: <b>{temp_day:.1f}°C</b>")
-    if temp_night is not None:
-        parts.append(f"Ночью: <b>{temp_night:.1f}°C</b>")
+    if temp_max is not None and temp_min is not None:
+        parts.append(f"Диапазон: <b>{temp_min:.1f}°C</b> … <b>{temp_max:.1f}°C</b>")
+    elif temp_avg is not None:
+        parts.append(f"Температура: <b>{temp_avg:.1f}°C</b>")
     if feels_like is not None:
-        parts.append(f"Ощущается как: <b>{feels_like:.1f}°C</b>")
+        parts.append(f"Ощущается в среднем как: <b>{feels_like:.1f}°C</b>")
     if humidity is not None:
-        parts.append(f"Влажность: {humidity}%")
+        parts.append(f"Влажность: {humidity:.0f}%")
     if wind_speed is not None:
-        parts.append(f"Ветер: {wind_speed} м/с")
-
+        parts.append(f"Ветер: {wind_speed:.1f} м/с")
     return "\n".join(parts)
-
-def format_weekly_forecast(city: str, daily: List[Dict[str, Any]], timezone_offset: int) -> str:
-    parts = [f"Погода на {len(daily)} дней в <b>{city}</b> 📅", ""]
-
-    for index, day in enumerate(daily, start=1):
-        parts.append(_format_daily_block(day, timezone_offset, index))
-
-    return "\n\n".join(parts)
 
 def format_single_forecast(city: str, day: Dict[str, Any], timezone_offset: int, day_index: int) -> str:
     header = f"Прогноз на {day_index}-й день для <b>{city}</b> 📅"
-    return "\n".join([header, "", _format_daily_block(day, timezone_offset, day_index)])
+    return "\n".join([header, "", _format_daily_block(day, day_index)])
 
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
@@ -170,5 +209,4 @@ def format_weather_message(city: str, data: Dict[str, Any]) -> str:
         parts.append(f"Влажность: {humidity}%")
     if wind_speed is not None:
         parts.append(f"Ветер: {wind_speed} м/с")
-
     return "\n".join(parts)

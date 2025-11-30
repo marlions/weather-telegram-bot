@@ -46,8 +46,8 @@ class ForecastForm(StatesGroup):
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Текущая погода"), KeyboardButton(text="Погода на неделю")],
-            [KeyboardButton(text="Погода на другой день")],
+            [KeyboardButton(text="Текущая погода"), KeyboardButton(text="Погода на 5 дней")],
+            [KeyboardButton(text="Прогноз на выбранный день")],
             [KeyboardButton(text="Сменить город")],
             [
                 KeyboardButton(text="Подписаться на прогноз"),
@@ -61,12 +61,12 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
 def forecast_day_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="2"), KeyboardButton(text="3"), KeyboardButton(text="4")],
-            [KeyboardButton(text="5"), KeyboardButton(text="6"), KeyboardButton(text="7")],
+            [KeyboardButton(text="1"), KeyboardButton(text="2"), KeyboardButton(text="3")],
+            [KeyboardButton(text="4"), KeyboardButton(text="5")],
             [KeyboardButton(text="⬅️ Назад")],
         ],
         resize_keyboard=True,
-        input_field_placeholder="Выберите день (2–7)",
+        input_field_placeholder="Выберите день (1–5)",
     )
 
 
@@ -110,7 +110,7 @@ async def btn_week_forecast(message: Message):
     city = user.city
 
     try:
-        daily, timezone_offset = await get_daily_forecast(city, 7)
+        daily, timezone_offset = await get_daily_forecast(city, 5)
         text = format_weekly_forecast(city, daily, timezone_offset)
         await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
     except Exception as e:
@@ -118,7 +118,7 @@ async def btn_week_forecast(message: Message):
             f"Error fetching weekly forecast for {city} for user {message.from_user.id}: {e}"
         )
         await message.answer(
-            f"Не удалось получить прогноз на неделю: {e}",
+            f"Не удалось получить прогноз: {e}",
             reply_markup=main_menu_keyboard(),
         )
 
@@ -131,7 +131,7 @@ async def btn_forecast_day(message: Message, state: FSMContext):
 
     await state.set_state(ForecastForm.waiting_for_day)
     await message.answer(
-        "На какой день показать прогноз? Выберите кнопку ниже (от 2 до 7).",
+        "На какой день показать прогноз? Выберите кнопку ниже (от 1 до 5).",
         reply_markup=forecast_day_keyboard(),
     )
 
@@ -159,8 +159,8 @@ async def cmd_start(message: Message):
                 "Можешь пользоваться командами или кнопками ниже.\n\n"
                 "Доступные действия:\n"
                 "• Текущая погода\n"
-                "• Погода на другой день\n"
-                "• Погода на неделю\n"
+                "• Прогноз на выбранный день\n"
+                "• Погода на 5 дней\n"
                 "• Сменить город\n"
                 "• Подписаться на прогноз\n"
                 "• Отписаться от прогноза",
@@ -202,14 +202,14 @@ async def process_forecast_day(message: Message, state: FSMContext):
 
     if not choice.isdigit():
         await message.answer(
-            "Пожалуйста, выберите число от 2 до 7.", reply_markup=forecast_day_keyboard()
+            "Пожалуйста, выберите число от 1 до 5.", reply_markup=forecast_day_keyboard()
         )
         return
     day_number = int(choice)
 
-    if day_number < 2 or day_number > 7:
+    if day_number < 1 or day_number > 5:
         await message.answer(
-            "Доступны прогнозы только на 2–7 день. Попробуйте снова.",
+            "Доступны прогнозы только на 1–5 день. Попробуйте снова.",
             reply_markup=forecast_day_keyboard(),
         )
         return
@@ -444,7 +444,7 @@ async def cmd_help(message: Message):
 
     - /current — Текущая погода в выбранном городе.
     - /set_city <город> — Установить город для прогнозов.
-    - Кнопки для прогноза на выбранный день и на неделю.
+    - Кнопки для прогноза на выбранный день и на 5 дней.
     - Подписка на ежедневные прогнозы (через кнопки).
     - Экстренные уведомления при критичных погодных условиях.
 
@@ -463,8 +463,8 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(unsubscribe_daily, Command(commands=["unsubscribe"]))
     dp.message.register(cmd_help, Command(commands=["help"]))
     dp.message.register(btn_current, F.text == "Текущая погода")
-    dp.message.register(btn_week_forecast, F.text == "Погода на неделю")
-    dp.message.register(btn_forecast_day, F.text == "Погода на другой день")
+    dp.message.register(btn_week_forecast, F.text == "Погода на 5 дней")
+    dp.message.register(btn_forecast_day, F.text == "Прогноз на выбранный день")
     dp.message.register(btn_set_city, F.text == "Сменить город")
     dp.message.register(subscribe_daily, F.text == "Подписаться на прогноз")
     dp.message.register(unsubscribe_daily, F.text == "Отписаться от прогноза")
