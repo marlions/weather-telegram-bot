@@ -118,7 +118,7 @@ async def btn_week_forecast(message: Message):
             f"Error fetching weekly forecast for {city} for user {message.from_user.id}: {e}"
         )
         await message.answer(
-            f"Не удалось получить прогноз: {e}",
+            f"Не удалось получить прогноз  на 5 дней: {e}",
             reply_markup=main_menu_keyboard(),
         )
 

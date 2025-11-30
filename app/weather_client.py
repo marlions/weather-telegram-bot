@@ -137,8 +137,8 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
         )
 
     data = resp.json()
-    list_data = data.get("list")
-    if not list_data:
+    forecast_list = data.get("list")
+    if not forecast_list:
         raise WeatherClientError("Погодные данные недоступны для выбранного города")
 
     timezone_offset = data.get("city", {}).get("timezone", 0)
@@ -179,6 +179,14 @@ def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
     if wind_speed is not None:
         parts.append(f"Ветер: {wind_speed:.1f} м/с")
     return "\n".join(parts)
+
+def format_weekly_forecast(city: str, daily: List[Dict[str, Any]], timezone_offset: int) -> str:
+    parts = [f"Погода на {len(daily)} дней в <b>{city}</b> 📅", ""]
+
+    for index, day in enumerate(daily, start=1):
+        parts.append(_format_daily_block(day, index))
+
+    return "\n\n".join(parts)
 
 def format_single_forecast(city: str, day: Dict[str, Any], timezone_offset: int, day_index: int) -> str:
     header = f"Прогноз на {day_index}-й день для <b>{city}</b> 📅"
