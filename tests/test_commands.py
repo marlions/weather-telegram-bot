@@ -112,3 +112,31 @@ async def test_update_city_persists_and_used_for_requests(monkeypatch):
     assert requested_cities == ["Новый", "Новый"], "Погодный запрос должен идти по новому городу"
     combined_responses = "\n".join(msg["text"] for msg in message_set_city.responses + message_current.responses)
     assert "Новый" in combined_responses
+
+@pytest.mark.asyncio
+async def test_unsubscribe_stops_notifications(monkeypatch):
+    user = User(id=2, telegram_id=200, username="subscriber", city="Москва", subscribed=True)
+    subscription = Subscription(
+        user_id=user.id,
+        city=user.city,
+        daily_notifications=True,
+    )
+
+    monkeypatch.setattr(main_module, "select", lambda *models: FakeSelect(*models))
+    monkeypatch.setattr(main_module, "async_session_maker", FakeSessionMaker(user, subscription))
+
+    unsubscribe_message = FakeMessage("/unsubscribe", user.telegram_id, user.username)
+    await main_module.unsubscribe_daily(unsubscribe_message)
+
+    assert subscription.daily_notifications is False
+    assert user.subscribed is False
+
+    async def fake_get_current_weather(city: str):
+        raise AssertionError("Не должно запрашиваться погода для отписанных пользователей")
+
+    monkeypatch.setattr(main_module, "get_current_weather", fake_get_current_weather)
+
+    bot = FakeBot()
+    await main_module.send_daily_weather(bot)
+
+    assert bot.messages == [], "Сообщения не должны отправляться после отписки"
