@@ -91,3 +91,22 @@ async def test_request_error_handled(monkeypatch):
     with patch("httpx.AsyncClient", lambda *args, **kwargs: ErrorAsyncClient()):
         with pytest.raises(WeatherClientError):
             await get_current_weather("Saint Petersburg")
+
+def test_format_weather_message_html_tags():
+    data = {
+        "main": {
+            "temp": 12.34,
+            "feels_like": 10.1,
+            "humidity": 55,
+        },
+        "weather": [{"description": "пасмурно"}],
+        "wind": {"speed": 3.2},
+    }
+
+    result = weather_client.format_weather_message("Москва", data)
+
+    assert "<b>Москва</b>" in result
+    assert "Температура: <b>12.3°C</b>" in result
+    assert "Ощущается как: <b>10.1°C</b>" in result
+    assert "Влажность: 55%" in result
+    assert "Ветер: 3.2 м/с" in result
