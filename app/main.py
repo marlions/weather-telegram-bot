@@ -27,6 +27,7 @@ logging.basicConfig(
     format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
     handlers=[
         logging.StreamHandler(),
+        logging.FileHandler("logs/app.log"),
         logging.FileHandler(log_path)
     ]
 )
@@ -47,32 +48,6 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
         input_field_placeholder="Выберите действие…",
     )
 
-
-async def ensure_user_exists(telegram_id: int, username: str = None):
-    try:
-        async with async_session_maker() as session:
-            user = await session.scalar(
-                select(User).where(User.telegram_id == telegram_id)
-            )
-
-            if user is None:
-                user = User(
-                    telegram_id=telegram_id,
-                    username=username,
-                )
-                session.add(user)
-                await session.commit()
-                logger.info(f"Created new user: {telegram_id}")
-            elif username and user.username != username:
-                user.username = username
-                await session.commit()
-                logger.info(f"Updated username for user: {telegram_id}")
-
-            return user
-    except Exception as e:
-        logger.exception(f"Error ensuring user exists {telegram_id}: {e}")
-        return None
-
 async def btn_current(message: Message):
     await cmd_current(message)
 
@@ -87,49 +62,46 @@ async def btn_set_city(message: Message, state: FSMContext):
 async def cmd_start(message: Message):
     try:
         logger.info(f"User start: {message.from_user.id} / {message.from_user.username}")
+        async with async_session_maker() as session:
+            user = await session.scalar(
+                select(User).where(User.telegram_id == message.from_user.id)
+            )
 
-        user = await ensure_user_exists(
-            telegram_id=message.from_user.id,
-            username=message.from_user.username
-        )
+            if user is None:
+                user = User(
+                    telegram_id=message.from_user.id,
+                    username=message.from_user.username,
+                )
+                session.add(user)
+                await session.commit()  # commit after adding the new user
+            else:
+                user.username = message.from_user.username
+                await session.commit()  # commit after updating the user
 
-        if user is None:
-            await message.answer("Произошла ошибка при создании пользователя. Попробуйте позже.")
-            return
-
-        await message.answer(
-            "Привет! Я бот для уведомлений о погоде 🌤\n\n"
-            "Можешь пользоваться командами или кнопками ниже.\n\n"
-            "Доступные действия:\n"
-            "• Текущая погода\n"
-            "• Сменить город",
-            reply_markup=main_menu_keyboard(),
-        )
-        logger.info(f"/start handled successfully for {message.from_user.id}")
+            await message.answer(
+                "Привет! Я бот для уведомлений о погоде 🌤\n\n"
+                "Можешь пользоваться командами или кнопками ниже.\n\n"
+                "Доступные действия:\n"
+                "• Текущая погода\n"
+                "• Сменить город",
+                reply_markup=main_menu_keyboard(),
+            )
+            logger.info(f"/start handled successfully for {message.from_user.id}")
     except Exception as e:
         logger.exception(f"Error in /start handler for user {message.from_user.id}: {e}")
         await message.answer("Произошла ошибка, попробуйте позже.")
 
-
 async def cmd_current(message: Message):
-    user = await ensure_user_exists(
-        telegram_id=message.from_user.id,
-        username=message.from_user.username
-    )
-
-    if user is None:
-        await message.answer("Произошла ошибка. Попробуйте позже.")
-        return
-
     async with async_session_maker() as session:
         user = await session.scalar(
             select(User).where(User.telegram_id == message.from_user.id)
         )
+    if user is None:
+        await message.answer("Я ещё не знаю, кто ты. Напиши сначала /start.")
+        return
 
     if not user.city:
-        await message.answer(
-            "Сначала задайте город через кнопку «Сменить город» или команду /set_city."
-        )
+        await message.answer("Сначала задай город командой:\n/set_city <город>")
         return
 
     city = user.city
@@ -145,30 +117,31 @@ async def cmd_current(message: Message):
         logger.exception(f"Error fetching weather for {city} for user {message.from_user.id}: {e}")
         await message.answer(f"Не получилось получить погоду: {e}")
 
-
-async def cmd_set_city(message: Message):
+async def cmd_set_city(message: Message, new_city=None):
     try:
+        logger.info(f"Setting city for user {message.from_user.id}: {new_city}")
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2:
             await message.answer("Использование: /set_city <город>\nНапример: /set_city Санкт-Петербург")
             return
 
         city = parts[1].strip()
-        logger.info(f"Setting city for user {message.from_user.id}: {city}")
-        user = await ensure_user_exists(
-            telegram_id=message.from_user.id,
-            username=message.from_user.username
-        )
-
-        if user is None:
-            await message.answer("Произошла ошибка. Попробуйте позже.")
-            return
 
         async with async_session_maker() as session:
             user = await session.scalar(
                 select(User).where(User.telegram_id == message.from_user.id)
             )
-            user.city = city
+
+            if user is None:
+                user = User(
+                    telegram_id=message.from_user.id,
+                    username=message.from_user.username,
+                    city=city,
+                )
+                session.add(user)
+            else:
+                user.city = city
+
             await session.commit()
 
         await message.answer(f"Окей, буду слать погоду для города: <b>{city}</b>", parse_mode="HTML")
@@ -177,123 +150,100 @@ async def cmd_set_city(message: Message):
         logger.exception(f"Error in /set_city for user {message.from_user.id}: {e}")
         await message.answer("Не удалось сохранить город.")
 
-
 async def process_city(message: Message, state: FSMContext):
     city = message.text.strip()
     if not city:
         await message.answer("Название города не должно быть пустым. Попробуйте ещё раз.")
         return
 
-    try:
-        user = await ensure_user_exists(
-            telegram_id=message.from_user.id,
-            username=message.from_user.username
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
         )
 
         if user is None:
-            await message.answer("Произошла ошибка. Попробуйте позже.")
-            return
-
-        async with async_session_maker() as session:
-            user = await session.scalar(
-                select(User).where(User.telegram_id == message.from_user.id)
+            user = User(
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                city=city,
             )
+            session.add(user)
+        else:
             user.city = city
-            await session.commit()
 
-        await state.clear()
+        await session.commit()
 
-        await message.answer(
-            f"Город обновлён на: <b>{city}</b>",
-            parse_mode="HTML",
-            reply_markup=main_menu_keyboard(),
-        )
-    except Exception as e:
-        logger.exception(f"Error in process_city for user {message.from_user.id}: {e}")
-        await message.answer("Не удалось сохранить город.")
+    await state.clear()
 
+    await message.answer(
+        f"Город обновлён на: <b>{city}</b>",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
+    )
 
 async def subscribe_daily(message: Message):
-    try:
-        user = await ensure_user_exists(
-            telegram_id=message.from_user.id,
-            username=message.from_user.username
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
         )
-
         if user is None:
-            await message.answer("Произошла ошибка. Попробуйте позже.")
+            await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
             return
 
-        async with async_session_maker() as session:
-            user = await session.scalar(
-                select(User).where(User.telegram_id == message.from_user.id)
+        if not user.city:
+            await message.answer(
+                "Сначала задайте город через кнопку «Сменить город» или команду /set_city."
             )
+            return
 
-            if not user.city:
-                await message.answer(
-                    "Сначала задайте город через кнопку «Сменить город» или команду /set_city."
-                )
-                return
-
-            sub = await session.scalar(
-                select(Subscription).where(Subscription.user_id == user.id)
-            )
-
-            if sub is None:
-                sub = Subscription(
-                    user_id=user.id,
-                    city=user.city,
-                    daily_notifications=True,
-                )
-                session.add(sub)
-            else:
-                sub.city = user.city
-                sub.daily_notifications = True
-
-            await session.commit()
-
-        await message.answer(
-            f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤",
-            parse_mode="HTML",
+        sub = await session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
         )
 
-        logger.info(f"User {message.from_user.id} subscribed to daily weather updates for {user.city}")
-    except Exception as e:
-        logger.exception(f"Error in subscribe_daily for user {message.from_user.id}: {e}")
-        await message.answer("Произошла ошибка при подписке.")
+        if sub is None:
+            sub = Subscription(
+                user_id=user.id,
+                city=user.city,
+                daily_notifications=True,
+            )
+            session.add(sub)
+        else:
+            sub.city = user.city
+            sub.daily_notifications = True
 
+        user.subscribed = True
+        await session.commit()
+
+    await message.answer(
+        f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤",
+        parse_mode="HTML",
+    )
+
+    logger.info(f"User {message.from_user.id} subscribed to daily weather updates for {user.city}")
 
 async def unsubscribe_daily(message: Message):
-    try:
-        user = await ensure_user_exists(
-            telegram_id=message.from_user.id,
-            username=message.from_user.username
+    async with async_session_maker() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
         )
 
         if user is None:
-            await message.answer("Произошла ошибка. Попробуйте позже.")
+            await message.answer("Я вас ещё не знаю. Напишите /start.")
             return
 
-        async with async_session_maker() as session:
-            user = await session.scalar(
-                select(User).where(User.telegram_id == message.from_user.id)
-            )
+        sub = await session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
 
-            sub = await session.scalar(
-                select(Subscription).where(Subscription.user_id == user.id)
-            )
+        if sub is None or not sub.daily_notifications:
+            await message.answer("Вы и так не подписаны на ежедневный прогноз.")
+            return
 
-            if sub is None or not sub.daily_notifications:
-                await message.answer("Вы и так не подписаны на ежедневный прогноз.")
-                return
+        sub.daily_notifications = False
+        user.subscribed = False
+        await session.commit()
 
-            sub.daily_notifications = False
-            await session.commit()
-
-        await message.answer("Вы отписались от ежедневных уведомлений о погоде.")
-    except Exception as e:
-        logger.exception(f"Error in unsubscribe_daily for user {message.from_user.id}: {e}")
-        await message.answer("Произошла ошибка при отписке.")
+    await message.answer("Вы отписались от ежедневных уведомлений о погоде.")
 
 async def send_daily_weather(bot: Bot):
     try:
