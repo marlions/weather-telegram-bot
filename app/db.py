@@ -1,12 +1,15 @@
-from sqlalchemy import create_engine
+import os
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from .config import settings
 
-DATABASE_URL = (
-    f"postgresql+asyncpg://"
-    f"{settings.postgres_user}:{settings.postgres_password}"
-    f"@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    (
+        f"postgresql+asyncpg://"
+        f"{settings.postgres_user}:{settings.postgres_password}"
+        f"@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
+    ),
 )
 
 engine = create_async_engine(DATABASE_URL, echo=True)
