@@ -67,6 +67,11 @@ async def test_daily_weather_flow(monkeypatch):
 
     import app.main as main_module
     monkeypatch.setattr(main_module, "get_current_weather", fake_get_current_weather)
+    monkeypatch.setattr(
+        main_module,
+        "async_session_maker",
+        FakeSessionMaker([(user, sub)]),
+    )
 
     fake_bot = FakeBot()
 
