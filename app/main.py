@@ -101,6 +101,40 @@ async def btn_set_city(message: Message, state: FSMContext):
         parse_mode="HTML",
     )
 
+async def btn_week_forecast(message: Message):
+    user = await _ensure_user_with_city(message)
+
+    if user is None or not user.city:
+        return
+
+    city = user.city
+
+    try:
+        daily, timezone_offset = await get_daily_forecast(city, 7)
+        text = format_weekly_forecast(city, daily, timezone_offset)
+        await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
+    except Exception as e:
+        logger.exception(
+            f"Error fetching weekly forecast for {city} for user {message.from_user.id}: {e}"
+        )
+        await message.answer(
+            f"Не удалось получить прогноз на неделю: {e}",
+            reply_markup=main_menu_keyboard(),
+        )
+
+
+async def btn_forecast_day(message: Message, state: FSMContext):
+    user = await _ensure_user_with_city(message)
+
+    if user is None or not user.city:
+        return
+
+    await state.set_state(ForecastForm.waiting_for_day)
+    await message.answer(
+        "На какой день показать прогноз? Выберите кнопку ниже (от 2 до 7).",
+        reply_markup=forecast_day_keyboard(),
+    )
+
 async def cmd_start(message: Message):
     try:
         logger.info(f"User start: {message.from_user.id} / {message.from_user.username}")
