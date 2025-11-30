@@ -47,7 +47,7 @@ def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     if temp is not None:
         parts.append(f"Температура: <b>{temp:.1f}°C</b>")
     if feels is not None:
-        parts.append(f"Ощущается как: {feels:.1f}°C")
+        parts.append(f"Ощущается как: <b>{feels:.1f}°C</b>")
     if humidity is not None:
         parts.append(f"Влажность: {humidity}%")
     if wind_speed is not None:
