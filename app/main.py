@@ -444,6 +444,7 @@ async def cmd_help(message: Message):
 
     - /current — Текущая погода в выбранном городе.
     - /set_city <город> — Установить город для прогнозов.
+    - Кнопки для прогноза на выбранный день и на неделю.
     - Подписка на ежедневные прогнозы (через кнопки).
     - Экстренные уведомления при критичных погодных условиях.
 
@@ -462,10 +463,13 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(unsubscribe_daily, Command(commands=["unsubscribe"]))
     dp.message.register(cmd_help, Command(commands=["help"]))
     dp.message.register(btn_current, F.text == "Текущая погода")
+    dp.message.register(btn_week_forecast, F.text == "Погода на неделю")
+    dp.message.register(btn_forecast_day, F.text == "Погода на другой день")
     dp.message.register(btn_set_city, F.text == "Сменить город")
     dp.message.register(subscribe_daily, F.text == "Подписаться на прогноз")
     dp.message.register(unsubscribe_daily, F.text == "Отписаться от прогноза")
     dp.message.register(process_city, CityForm.waiting_for_city)
+    dp.message.register(process_forecast_day, ForecastForm.waiting_for_day)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
