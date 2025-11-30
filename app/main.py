@@ -127,6 +127,10 @@ async def cmd_set_city(message: Message, new_city=None):
 
         city = parts[1].strip()
 
+        if not city:
+            await message.answer("Город не может быть пустым. Попробуйте ещё раз.")
+            return
+
         async with async_session_maker() as session:
             user = await session.scalar(
                 select(User).where(User.telegram_id == message.from_user.id)
