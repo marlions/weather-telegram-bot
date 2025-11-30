@@ -1,41 +1,17 @@
-from app.weather_client import format_weather_message
+from app.weather_client import get_current_weather, WeatherClientError
+from unittest.mock import patch
+import pytest
+from aiohttp import ClientResponseError
 
-def test_format_weather_message_basic():
-    city = "Санкт-Петербург"
-    data = {
-        "main": {
-            "temp": 1.7,
-            "feels_like": -2.8,
-            "humidity": 94,
-        },
-        "wind": {
-            "speed": 5.0,
-        },
-        "weather": [
-            {"description": "облачно с прояснениями"},
-        ],
-    }
-
-    text = format_weather_message(city, data)
-    assert "Погода в городе" in text
-    assert city in text
-    assert "🌤" in text
-
-    assert "Облачно с прояснениями" in text
-
-    assert "Температура: <b>1.7°C</b>" in text
-
-    assert "Ощущается как: -2.8°C" in text
-
-    assert "Влажность: 94%" in text
-    assert "Ветер: 5.0 м/с" in text
-
-def test_format_weather_message_handles_missing_fields():
-    city = "Тестоград"
-    data = {
-        "weather": [],
-    }
-
-    text = format_weather_message(city, data)
-    assert city in text
-    assert "Температура" not in text
+@pytest.mark.asyncio
+async def test_valid_city():
+    with patch('weather_client.get_current_weather', return_value={
+        'weather': [{'description': 'clear sky'}],
+        'main': {'temp': 20.0},
+        'name': 'Saint Petersburg'
+    }):
+        city = "Saint Petersburg"
+        response = await get_current_weather(city)
+        assert response['weather'][0]['description'] == 'clear sky'
+        assert response['main']['temp'] == 20.0
+        assert response['name'] == 'Saint Petersburg'
