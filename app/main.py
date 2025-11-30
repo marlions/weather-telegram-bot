@@ -83,7 +83,9 @@ async def cmd_start(message: Message):
                 "Можешь пользоваться командами или кнопками ниже.\n\n"
                 "Доступные действия:\n"
                 "• Текущая погода\n"
-                "• Сменить город",
+                "• Сменить город\n"
+                "• Подписаться на прогноз\n"
+                "• Отписаться от прогноза",
                 reply_markup=main_menu_keyboard(),
             )
             logger.info(f"/start handled successfully for {message.from_user.id}")
@@ -170,6 +172,7 @@ async def process_city(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer(f"Не удалось найти город: {city}. Проверьте правильность написания.")
         return
+
     async with async_session_maker() as session:
         user = await session.scalar(
             select(User).where(User.telegram_id == message.from_user.id)
