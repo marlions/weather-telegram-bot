@@ -222,6 +222,29 @@ async def process_forecast_day(message: Message, state: FSMContext):
 
     city = user.city
 
+    try:
+        daily, timezone_offset = await get_daily_forecast(city, day_number)
+
+        if len(daily) < day_number:
+            await message.answer(
+                "Сервис вернул недостаточно данных. Попробуйте позже.",
+                reply_markup=main_menu_keyboard(),
+            )
+            await state.clear()
+            return
+
+        text = format_single_forecast(city, daily[day_number - 1], timezone_offset, day_number)
+        await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
+    except Exception as e:
+        logger.exception(
+            f"Error fetching forecast for day {day_number} for {city} / {message.from_user.id}: {e}"
+        )
+        await message.answer(
+            f"Не удалось получить прогноз: {e}", reply_markup=main_menu_keyboard()
+        )
+    finally:
+        await state.clear()
+
 async def cmd_set_city(message: Message, new_city=None):
     try:
         logger.info(f"Setting city for user {message.from_user.id}: {new_city}")
