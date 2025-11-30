@@ -96,6 +96,13 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
 
     return daily[:days], timezone_offset
 
+def _format_date(timestamp: int, timezone_offset: int) -> str:
+    if timestamp is None:
+        return ""
+
+    dt = datetime.fromtimestamp(timestamp + timezone_offset, tz=timezone.utc)
+    return dt.strftime("%d %b")
+
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
     weather_list = data.get("weather", [])
