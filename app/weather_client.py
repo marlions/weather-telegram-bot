@@ -38,6 +38,29 @@ async def _get_city_coordinates(city: str) -> Tuple[float, float]:
         "appid": settings.openweather_api_key,
     }
 
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            resp = await client.get("https://api.openweathermap.org/geo/1.0/direct", params=params)
+        except httpx.RequestError as e:
+            raise WeatherClientError(f"Ошибка сети при поиске города: {e}") from e
+
+    if resp.status_code != 200:
+        raise WeatherClientError(
+            f"Сервис геокодирования вернул ошибку: {resp.status_code} {resp.text}"
+        )
+
+    data = resp.json()
+    if not data:
+        raise WeatherClientError("Город не найден, проверьте написание")
+
+    lat = data[0].get("lat")
+    lon = data[0].get("lon")
+
+    if lat is None or lon is None:
+        raise WeatherClientError("Не удалось определить координаты города")
+
+    return float(lat), float(lon)
+
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
     weather_list = data.get("weather", [])
