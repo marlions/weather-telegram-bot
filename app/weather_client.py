@@ -78,9 +78,14 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            resp = await client.get("https://api.openweathermap.org/data/2.5/onecall", params=params)
+            resp = await client.get("https://api.openweathermap.org/data/3.0/onecall", params=params)
         except httpx.RequestError as e:
             raise WeatherClientError(f"Ошибка сети при запросе прогноза: {e}") from e
+
+    if resp.status_code == 401:
+        raise WeatherClientError(
+            "API-ключ OpenWeatherMap недействителен или не имеет доступа к One Call. Проверьте настройку OPENWEATHER_API_KEY."
+        )
 
     if resp.status_code != 200:
         raise WeatherClientError(
