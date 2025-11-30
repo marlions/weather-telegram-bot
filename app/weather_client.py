@@ -128,6 +128,14 @@ def _format_daily_block(day: Dict[str, Any], timezone_offset: int, day_index: in
 
     return "\n".join(parts)
 
+def format_weekly_forecast(city: str, daily: List[Dict[str, Any]], timezone_offset: int) -> str:
+    parts = [f"Погода на {len(daily)} дней в <b>{city}</b> 📅", ""]
+
+    for index, day in enumerate(daily, start=1):
+        parts.append(_format_daily_block(day, timezone_offset, index))
+
+    return "\n\n".join(parts)
+
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
     weather_list = data.get("weather", [])
