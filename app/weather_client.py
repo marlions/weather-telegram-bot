@@ -136,6 +136,10 @@ def format_weekly_forecast(city: str, daily: List[Dict[str, Any]], timezone_offs
 
     return "\n\n".join(parts)
 
+def format_single_forecast(city: str, day: Dict[str, Any], timezone_offset: int, day_index: int) -> str:
+    header = f"Прогноз на {day_index}-й день для <b>{city}</b> 📅"
+    return "\n".join([header, "", _format_daily_block(day, timezone_offset, day_index)])
+
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
     weather_list = data.get("weather", [])
