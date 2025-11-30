@@ -1,32 +1,75 @@
-from app.weather_client import get_current_weather, WeatherClientError
-from unittest.mock import patch
 import pytest
-from httpx import HTTPStatusError, Response
+import httpx
+from unittest.mock import patch
+
+from app import weather_client
+from app.weather_client import get_current_weather, WeatherClientError
+
+
+class MockAsyncClient:
+    def __init__(self, response: httpx.Response):
+        self._response = response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, *args, **kwargs):
+        return self._response
+
+
+def mock_async_client(response: httpx.Response):
+    def _client_factory(*args, **kwargs):
+        return MockAsyncClient(response)
+    return _client_factory
+
+
+@pytest.fixture(autouse=True)
+def mock_api_key():
+    original_key = weather_client.settings.openweather_api_key
+    weather_client.settings.openweather_api_key = "test-key"
+    try:
+        yield
+    finally:
+        weather_client.settings.openweather_api_key = original_key
 
 @pytest.mark.asyncio
 async def test_valid_city():
-    with patch('weather_client.get_current_weather', return_value={
-        'weather': [{'description': 'clear sky'}],
-        'main': {'temp': 20.0},
-        'name': 'Saint Petersburg'
-    }):
-        city = "Saint Petersburg"
-        response = await get_current_weather(city)
-        assert response['weather'][0]['description'] == 'clear sky'
-        assert response['main']['temp'] == 20.0
-        assert response['name'] == 'Saint Petersburg'
+    response = httpx.Response(
+        status_code=200,
+        json={
+            "weather": [{"description": "clear sky"}],
+            "main": {"temp": 20.0},
+            "name": "Saint Petersburg",
+        },
+        request=httpx.Request("GET", "https://api.openweathermap.org/data/2.5/weather"),
+    )
+    with patch("httpx.AsyncClient", mock_async_client(response)):
+        result = await get_current_weather("Saint Petersburg")
+    assert result["weather"][0]["description"] == "clear sky"
+    assert result["main"]["temp"] == 20.0
+    assert result["name"] == "Saint Petersburg"
 
 @pytest.mark.asyncio
 async def test_invalid_city():
-    with patch('app.weather_client.get_current_weather', side_effect=WeatherClientError("City not found")):
-        city = "InvalidCity"
+    response = httpx.Response(
+        status_code=404,
+        json={},
+        request=httpx.Request("GET", "https://api.openweathermap.org/data/2.5/weather"),
+    )
+    with patch("httpx.AsyncClient", mock_async_client(response)):
         with pytest.raises(WeatherClientError):
-            await get_current_weather(city)
+            await get_current_weather("InvalidCity")
 
 @pytest.mark.asyncio
 async def test_weather_api_error():
-    with patch('app.weather_client.get_current_weather', side_effect=HTTPStatusError(
-            "Not Found", request=None, response=Response(status_code=404))):
-        city = "Saint Petersburg"
-        with pytest.raises(HTTPStatusError):
-            await get_current_weather(city)
+    response = httpx.Response(
+        status_code=500,
+        json={"message": "Server error"},
+        request=httpx.Request("GET", "https://api.openweathermap.org/data/2.5/weather"),
+    )
+    with patch("httpx.AsyncClient", mock_async_client(response)):
+        with pytest.raises(WeatherClientError):
+            await get_current_weather("Saint Petersburg")
