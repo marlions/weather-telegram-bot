@@ -172,16 +172,9 @@ async def cmd_start(message: Message):
         await message.answer("Произошла ошибка, попробуйте позже.")
 
 async def cmd_current(message: Message):
-    async with async_session_maker() as session:
-        user = await session.scalar(
-            select(User).where(User.telegram_id == message.from_user.id)
-        )
-    if user is None:
-        await message.answer("Я ещё не знаю, кто ты. Напиши сначала /start.")
-        return
+    user = await _ensure_user_with_city(message)
 
-    if not user.city:
-        await message.answer("Сначала задай город командой:\n/set_city <город>")
+    if user is None or not user.city:
         return
 
     city = user.city
