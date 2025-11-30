@@ -81,3 +81,34 @@ class FakeBot:
 
     async def send_message(self, chat_id, text, parse_mode=None):
         self.messages.append({"chat_id": chat_id, "text": text, "parse_mode": parse_mode})
+
+@pytest.mark.asyncio
+async def test_update_city_persists_and_used_for_requests(monkeypatch):
+    user = User(id=1, telegram_id=100, username="tester", city="Старый", subscribed=True)
+    subscription = Subscription(user_id=user.id, city=user.city, daily_notifications=True)
+
+    requested_cities: list[str] = []
+
+    async def fake_get_current_weather(city: str):
+        requested_cities.append(city)
+        return {
+            "main": {"temp": 5.0, "feels_like": 3.0},
+            "weather": [{"description": "ясно"}],
+        }
+
+    monkeypatch.setattr(main_module, "get_current_weather", fake_get_current_weather)
+    monkeypatch.setattr(main_module, "async_session_maker", FakeSessionMaker(user, subscription))
+    monkeypatch.setattr(main_module, "select", lambda *models: FakeSelect(*models))
+
+    message_set_city = FakeMessage("/set_city Новый", user.telegram_id, user.username)
+    await main_module.cmd_set_city(message_set_city)
+
+    assert user.city == "Новый"
+    assert requested_cities == ["Новый"], "Для валидации должен использоваться новый город"
+
+    message_current = FakeMessage("/current", user.telegram_id, user.username)
+    await main_module.cmd_current(message_current)
+
+    assert requested_cities == ["Новый", "Новый"], "Погодный запрос должен идти по новому городу"
+    combined_responses = "\n".join(msg["text"] for msg in message_set_city.responses + message_current.responses)
+    assert "Новый" in combined_responses
