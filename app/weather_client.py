@@ -76,6 +76,26 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
         "appid": settings.openweather_api_key,
     }
 
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            resp = await client.get("https://api.openweathermap.org/data/2.5/onecall", params=params)
+        except httpx.RequestError as e:
+            raise WeatherClientError(f"Ошибка сети при запросе прогноза: {e}") from e
+
+    if resp.status_code != 200:
+        raise WeatherClientError(
+            f"Сервис прогноза вернул ошибку: {resp.status_code} {resp.text}"
+        )
+
+    data = resp.json()
+    daily = data.get("daily")
+    if not daily:
+        raise WeatherClientError("Погодные данные недоступны для выбранного города")
+
+    timezone_offset = data.get("timezone_offset", 0)
+
+    return daily[:days], timezone_offset
+
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
     weather_list = data.get("weather", [])
