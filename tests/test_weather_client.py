@@ -22,3 +22,11 @@ async def test_invalid_city():
         city = "InvalidCity"
         with pytest.raises(WeatherClientError):
             await get_current_weather(city)
+
+@pytest.mark.asyncio
+async def test_weather_api_error():
+    with patch('app.weather_client.get_current_weather', side_effect=ClientResponseError(
+        request_info=None, code=404, message="Not Found")):
+        city = "Saint Petersburg"
+        with pytest.raises(ClientResponseError):
+            await get_current_weather(city)
