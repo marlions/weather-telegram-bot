@@ -205,6 +205,22 @@ async def process_forecast_day(message: Message, state: FSMContext):
             "Пожалуйста, выберите число от 2 до 7.", reply_markup=forecast_day_keyboard()
         )
         return
+    day_number = int(choice)
+
+    if day_number < 2 or day_number > 7:
+        await message.answer(
+            "Доступны прогнозы только на 2–7 день. Попробуйте снова.",
+            reply_markup=forecast_day_keyboard(),
+        )
+        return
+
+    user = await _ensure_user_with_city(message)
+
+    if user is None or not user.city:
+        await state.clear()
+        return
+
+    city = user.city
 
 async def cmd_set_city(message: Message, new_city=None):
     try:
