@@ -58,7 +58,37 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
         input_field_placeholder="Выберите действие…",
     )
 
+def forecast_day_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="2"), KeyboardButton(text="3"), KeyboardButton(text="4")],
+            [KeyboardButton(text="5"), KeyboardButton(text="6"), KeyboardButton(text="7")],
+            [KeyboardButton(text="⬅️ Назад")],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите день (2–7)",
+    )
 
+
+async def _get_user(message: Message) -> User | None:
+    async with async_session_maker() as session:
+        return await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+
+
+async def _ensure_user_with_city(message: Message) -> User | None:
+    user = await _get_user(message)
+
+    if user is None:
+        await message.answer("Я ещё не знаю, кто ты. Напиши сначала /start.")
+        return None
+
+    if not user.city:
+        await message.answer("Сначала задай город командой:\n/set_city <город>")
+        return None
+
+    return user
 
 async def btn_current(message: Message):
     await cmd_current(message)
