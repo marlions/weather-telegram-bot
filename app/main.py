@@ -357,7 +357,7 @@ async def process_city(message: Message, state: FSMContext):
         reply_markup=main_menu_keyboard(),
     )
 
-async def subscribe_daily(message: Message):
+async def subscribe_daily(message: Message, state: FSMContext):
     async with async_session_maker() as session:
         user = await session.scalar(
             select(User).where(User.telegram_id == message.from_user.id)
@@ -372,33 +372,11 @@ async def subscribe_daily(message: Message):
             )
             return
 
-        sub = await session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
-
-        if sub is None:
-            sub = Subscription(
-                user_id=user.id,
-                city=user.city,
-                daily_notifications=True,
-                notification_time=DEFAULT_NOTIFICATION_TIME,
-            )
-            session.add(sub)
-        else:
-            sub.city = user.city
-            sub.daily_notifications = True
-            if not sub.notification_time:
-                sub.notification_time = DEFAULT_NOTIFICATION_TIME
-
-        user.subscribed = True
-        await session.commit()
-
     await message.answer(
-        f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤",
-        parse_mode="HTML",
+        "Выберите время получения уведомлений", reply_markup=notification_time_keyboard()
     )
-
-    logger.info(f"User {message.from_user.id} subscribed to daily weather updates for {user.city}")
+    await state.set_state(NotificationTimeForm.waiting_for_time_choice)
+    logger.info(f"User {message.from_user.id} started subscription flow")
 
 async def unsubscribe_daily(message: Message):
     async with async_session_maker() as session:
