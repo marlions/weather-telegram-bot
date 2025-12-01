@@ -483,6 +483,22 @@ async def process_notification_choice(message: Message, state: FSMContext):
         "Вечером": "18:00",
     }
 
+    if choice == "⬅️ Назад":
+        await state.clear()
+        await message.answer("Возвращаюсь в главное меню.", reply_markup=main_menu_keyboard())
+        return
+
+    if choice == "Своё время":
+        await ask_notification_time(message, state)
+        return
+
+    if choice not in preset_times:
+        await message.answer(
+            "Пожалуйста, выберите один из предложенных вариантов.",
+            reply_markup=notification_time_keyboard(),
+        )
+        return
+
 async def send_daily_weather(bot: Bot, current_time: str | None = None):
     try:
         target_time = current_time or datetime.utcnow().strftime("%H:%M")
