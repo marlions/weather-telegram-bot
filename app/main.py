@@ -566,10 +566,10 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(btn_forecast_day, F.text == "Прогноз на выбранный день")
     dp.message.register(btn_set_city, F.text == "Сменить город")
     dp.message.register(subscribe_daily, F.text == "Подписаться на прогноз")
-    dp.message.register(ask_notification_time, F.text == "Время уведомлений")
     dp.message.register(unsubscribe_daily, F.text == "Отписаться от прогноза")
     dp.message.register(process_city, CityForm.waiting_for_city)
     dp.message.register(process_forecast_day, ForecastForm.waiting_for_day)
+    dp.message.register(process_notification_choice, NotificationTimeForm.waiting_for_time_choice)
     dp.message.register(process_notification_time, NotificationTimeForm.waiting_for_time)
 
 async def main():
