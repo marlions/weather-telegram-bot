@@ -507,7 +507,7 @@ async def send_daily_weather(bot: Bot, current_time: str | None = None):
 
         users_by_city: dict[str, list[int]] = {}
 
-        for user, sub in rows:
+        for user, sub in filtered_rows:
             city = user.city or sub.city
             if not city:
                 continue
@@ -544,6 +544,7 @@ async def cmd_help(message: Message):
 
     - /current — Текущая погода в выбранном городе.
     - /set_city <город> — Установить город для прогнозов.
+    - /set_notification_time <ЧЧ:ММ> — Установить время ежедневных уведомлений.
     - Кнопки для прогноза на выбранный день и на 5 дней.
     - Подписка на ежедневные прогнозы (через кнопки).
     - Экстренные уведомления при критичных погодных условиях.
@@ -560,6 +561,7 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
     dp.message.register(cmd_current, Command(commands=["current"]))
     dp.message.register(subscribe_daily, Command(commands=["subscribe_daily"]))
+    dp.message.register(ask_notification_time, Command(commands=["set_notification_time", "set_notify_time"]))
     dp.message.register(unsubscribe_daily, Command(commands=["unsubscribe"]))
     dp.message.register(cmd_help, Command(commands=["help"]))
     dp.message.register(btn_current, F.text == "Текущая погода")
@@ -567,9 +569,11 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(btn_forecast_day, F.text == "Прогноз на выбранный день")
     dp.message.register(btn_set_city, F.text == "Сменить город")
     dp.message.register(subscribe_daily, F.text == "Подписаться на прогноз")
+    dp.message.register(ask_notification_time, F.text == "Время уведомлений")
     dp.message.register(unsubscribe_daily, F.text == "Отписаться от прогноза")
     dp.message.register(process_city, CityForm.waiting_for_city)
     dp.message.register(process_forecast_day, ForecastForm.waiting_for_day)
+    dp.message.register(process_notification_time, NotificationTimeForm.waiting_for_time)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
@@ -590,8 +594,7 @@ async def main():
     scheduler.add_job(
         send_daily_weather,
         "cron",
-        hour=6,
-        minute=0,
+        minute="*",
         args=[bot],
         id="daily_weather_job",
         replace_existing=True,
