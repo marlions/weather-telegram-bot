@@ -53,3 +53,15 @@ try:
                 await r.set(key, json.dumps(value), ex=ttl)
             else:
                 await _inmem.set(key, value, ttl)
+    else:
+        async def get_cached(key: str):
+            return await _inmem.get(key)
+
+        async def set_cached(key: str, value: Any, ttl: int = 300):
+            await _inmem.set(key, value, ttl)
+except Exception:
+    async def get_cached(key: str):
+        return await _inmem.get(key)
+
+    async def set_cached(key: str, value: Any, ttl: int = 300):
+        await _inmem.set(key, value, ttl)
