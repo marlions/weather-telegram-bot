@@ -28,3 +28,28 @@ class InMemoryTTLCache:
             self._store[key] = (time.time(), ttl, value)
 
 _inmem = InMemoryTTLCache()
+
+_redis_client = None
+try:
+    if REDIS_URL:
+        import aioredis
+
+        async def _get_redis():
+            global _redis_client
+            if _redis_client is None:
+                _redis_client = aioredis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
+            return _redis_client
+
+        async def get_cached(key: str):
+            r = await _get_redis()
+            if r is None:
+                return await _inmem.get(key)
+            data = await r.get(key)
+            return json.loads(data) if data else None
+
+        async def set_cached(key: str, value: Any, ttl: int = 300):
+            r = await _get_redis()
+            if r:
+                await r.set(key, json.dumps(value), ex=ttl)
+            else:
+                await _inmem.set(key, value, ttl)
