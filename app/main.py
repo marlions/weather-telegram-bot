@@ -412,18 +412,31 @@ async def ask_notification_time(message: Message, state: FSMContext):
     await message.answer(
         "Введите время для ежедневных уведомлений в формате <b>ЧЧ:ММ</b> (UTC).",
         parse_mode="HTML",
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="⬅️ Назад")]],
+            resize_keyboard=True,
+            input_field_placeholder="Напишите время или вернитесь назад",
+        ),
     )
 
 async def process_notification_time(message: Message, state: FSMContext):
     time_input = message.text.strip()
+
+    if time_input == "⬅️ Назад":
+        await state.set_state(NotificationTimeForm.waiting_for_time_choice)
+        await message.answer(
+            "Хорошо, выберите время уведомлений заново.",
+            reply_markup=notification_time_keyboard(),
+        )
+        return
+
     normalized_time = normalize_time_input(time_input)
 
     if normalized_time is None:
         await message.answer(
             "Не удалось распознать время. Используйте формат ЧЧ:ММ, например 08:30.",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=notification_time_keyboard(),
         )
-        await state.clear()
         return
 
     user = await _ensure_user_with_city(message)
