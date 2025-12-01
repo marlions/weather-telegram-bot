@@ -419,6 +419,33 @@ async def ask_notification_time(message: Message, state: FSMContext):
         ),
     )
 
+async def save_notification_time(message: Message, time: str, city: str):
+    async with async_session_maker() as session:
+        db_user = await session.scalar(select(User).where(User.telegram_id == message.from_user.id))
+        if db_user is None:
+            await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
+            return
+
+        subscription = await session.scalar(
+            select(Subscription).where(Subscription.user_id == db_user.id)
+        )
+
+        if subscription is None:
+            subscription = Subscription(
+                user_id=db_user.id,
+                city=city,  # Используем город из базы данных
+                daily_notifications=True,
+                notification_time=time,
+            )
+            session.add(subscription)
+        else:
+            subscription.notification_time = time
+            subscription.daily_notifications = True
+
+        db_user.subscribed = True
+        await session.commit()
+
+
 async def process_notification_time(message: Message, state: FSMContext):
     time_input = message.text.strip()
 
@@ -438,6 +465,16 @@ async def process_notification_time(message: Message, state: FSMContext):
             reply_markup=notification_time_keyboard(),
         )
         return
+
+    await save_notification_time(message, normalized_time)
+
+    await state.clear()
+    await message.answer(
+        f"Время уведомлений сохранено: <b>{normalized_time}</b>. "
+        "Подпишитесь на прогноз, чтобы получать сообщения.",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
+    )
 
     user = await _ensure_user_with_city(message)
 
@@ -513,6 +550,28 @@ async def process_notification_choice(message: Message, state: FSMContext):
         return
 
     normalized_time = preset_times[choice]
+
+    async with async_session_maker() as session:
+        db_user = await session.scalar(select(User).where(User.telegram_id == message.from_user.id))
+        if db_user is None:
+            await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
+            return
+
+        city = db_user.city  # Получаем город из данных пользователя
+
+    if not city:
+        await message.answer("Город не указан. Пожалуйста, укажите свой город с помощью команды /start.")
+        return
+
+    # Сохраняем выбранное время уведомлений
+    await save_notification_time(message, normalized_time, city)
+
+    await message.answer(
+        f"Вы подписались на ежедневный прогноз для города: <b>{city}</b> 🌤\n"
+        f"Время уведомлений: <b>{normalized_time}</b> (UTC)",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
+    )
 
     async with async_session_maker() as session:
         db_user = await session.scalar(
