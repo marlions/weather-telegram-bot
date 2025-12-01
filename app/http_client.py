@@ -2,10 +2,8 @@ import asyncio
 import logging
 import os
 from typing import Optional, Any, Dict
-
 import aiohttp
 from aiohttp import ClientError, ClientResponse
-
 logger = logging.getLogger(__name__)
 
 _MAX_RETRIES = int(os.getenv("HTTPCLIENT_MAX_RETRIES", "3"))
