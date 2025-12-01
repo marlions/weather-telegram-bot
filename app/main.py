@@ -303,6 +303,7 @@ async def set_notification_time_handler(message: Message, state: FSMContext):
     try:
         async with async_session_maker() as session:
             await save_notification_time(session, user.id, normalized)
+            asyncio.create_task(send_daily_weather(message.bot, None, normalized))
     except Exception as e:
         logger.exception(f"Error saving notification time for user {user.id}: {e}")
         await message.answer("Не удалось сохранить время уведомлений. Попробуйте ещё раз.")
@@ -535,6 +536,7 @@ async def process_notification_time(message: Message, state: FSMContext):
 
         db_user.subscribed = True
         await session.commit()
+        asyncio.create_task(send_daily_weather(message.bot, None, normalized_time))
 
     await state.clear()
 
@@ -623,6 +625,7 @@ async def process_notification_choice(message: Message, state: FSMContext):
 
         db_user.subscribed = True
         await session.commit()
+        asyncio.create_task(send_daily_weather(message.bot, None, normalized_time))
 
     await state.clear()
     logger.info(
@@ -630,14 +633,14 @@ async def process_notification_choice(message: Message, state: FSMContext):
     )
 
 
-async def send_daily_weather(bot, http_client: httpx.AsyncClient | None = None, current_time=DEFAULT_NOTIFICATION_TIME):
+async def send_daily_weather(bot, http_client: httpx.AsyncClient | None = None, current_time: str | None = None):
     created_client = False
     if http_client is None:
         http_client = httpx.AsyncClient()
         created_client = True
 
     try:
-        target_time = current_time or datetime.utcnow().strftime("%H:%M")
+        target_time = current_time if current_time is not None else datetime.utcnow().strftime("%H:%M")
         logger.info(f"Starting daily weather broadcast for {target_time}")
 
         async with async_session_maker() as session:
