@@ -448,15 +448,16 @@ async def process_notification_time(message: Message, state: FSMContext):
             subscription = Subscription(
                 user_id=db_user.id,
                 city=db_user.city or "",
-                daily_notifications=db_user.subscribed,
+                daily_notifications=True,
                 notification_time=normalized_time,
             )
             session.add(subscription)
         else:
             subscription.notification_time = normalized_time
+            subscription.daily_notifications = True
             if db_user.city:
                 subscription.city = db_user.city
-
+        db_user.subscribed = True
         await session.commit()
 
     await state.clear()
