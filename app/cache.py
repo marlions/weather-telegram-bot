@@ -21,3 +21,10 @@ class InMemoryTTLCache:
                 del self._store[key]
                 return None
             return value
+
+    async def set(self, key: str, value: Any, ttl: int = 300):
+        async with self._lock:
+            import time
+            self._store[key] = (time.time(), ttl, value)
+
+_inmem = InMemoryTTLCache()
