@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
@@ -637,10 +637,17 @@ def setup_handlers(dp: Dispatcher):
     dp.message.register(btn_set_city, F.text == "Сменить город")
     dp.message.register(subscribe_daily, F.text == "Подписаться на прогноз")
     dp.message.register(unsubscribe_daily, F.text == "Отписаться от прогноза")
-    dp.message.register(process_city, CityForm.waiting_for_city)
-    dp.message.register(process_forecast_day, ForecastForm.waiting_for_day)
-    dp.message.register(process_notification_choice, NotificationTimeForm.waiting_for_time_choice)
-    dp.message.register(process_notification_time, NotificationTimeForm.waiting_for_time)
+    dp.message.register(process_city, StateFilter(CityForm.waiting_for_city))
+    dp.message.register(
+        process_forecast_day, StateFilter(ForecastForm.waiting_for_day)
+    )
+    dp.message.register(
+        process_notification_choice,
+        StateFilter(NotificationTimeForm.waiting_for_time_choice),
+    )
+    dp.message.register(
+        process_notification_time, StateFilter(NotificationTimeForm.waiting_for_time)
+    )
 
 async def main():
     logging.basicConfig(level=logging.INFO)
