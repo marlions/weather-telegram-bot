@@ -448,11 +448,18 @@ async def ask_notification_time(message: Message, state: FSMContext):
 
 async def save_notification_time(session, user_id: int, notification_time: str):
     normalized_time = notification_time.strip()
+    try:
+        datetime.strptime(normalized_time, '%H:%M')
+    except ValueError:
+        raise ValueError("Неверный формат времени. Используйте формат ЧЧ:ММ.")
+
     subscription = await session.scalar(
         select(Subscription).where(Subscription.user_id == user_id)
     )
+
     if subscription:
         subscription.notification_time = normalized_time
+        subscription.daily_notifications = True
     else:
         subscription = Subscription(
             user_id=user_id,
@@ -460,6 +467,7 @@ async def save_notification_time(session, user_id: int, notification_time: str):
             daily_notifications=True
         )
         session.add(subscription)
+
     await session.commit()
 
 async def process_notification_time(message: Message, state: FSMContext):
@@ -617,13 +625,6 @@ async def process_notification_choice(message: Message, state: FSMContext):
         await session.commit()
 
     await state.clear()
-    await message.answer(
-        f"Вы подписались на ежедневный прогноз для города: <b>{db_user.city}</b> 🌤\n"
-        f"Время уведомлений: <b>{normalized_time}</b> (UTC)",
-        parse_mode="HTML",
-        reply_markup=main_menu_keyboard(),
-    )
-
     logger.info(
         f"User {message.from_user.id} subscribed to daily weather updates for {db_user.city} at {normalized_time}"
     )
@@ -641,10 +642,9 @@ async def send_daily_weather(bot: Bot, current_time: str | None = None):
                     Subscription.daily_notifications == True,
                     User.city.isnot(None),
                     func.coalesce(
-                        Subscription.notification_time.cast(func.VARCHAR),
+                        Subscription.notification_time,
                         DEFAULT_NOTIFICATION_TIME
-                    )
-                    == target_time,
+                    ) == target_time,
                 )
             )
             rows = result.all()

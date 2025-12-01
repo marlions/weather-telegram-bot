@@ -24,7 +24,7 @@ class Subscription(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    city = Column(String, nullable=False)
+    city = Column(String, nullable=True)
     daily_notifications = Column(Boolean, default=True)
     notification_time = Column(String, nullable=True)
 
@@ -33,7 +33,8 @@ class Subscription(Base):
     def __repr__(self):
         return (
             f"<Subscription(id={self.id}, user_id={self.user_id}, "
-            f"city={self.city}, daily_notifications={self.daily_notifications})>"
+            f"city={self.city}, daily_notifications={self.daily_notifications}, "
+            f"notification_time={self.notification_time})>"
         )
 
 User.subscriptions = relationship(
