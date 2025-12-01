@@ -1,11 +1,43 @@
 from collections import Counter, defaultdict
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Tuple
 import httpx
 from .config import settings
 
 class WeatherClientError(Exception):
     pass
+
+def _get_weather_icon(main: str | None = None, description: str | None = None) -> str:
+    main_lower = main.lower() if main else ""
+    description_lower = description.lower() if description else ""
+
+    def contains(*keywords: str) -> bool:
+        return any(keyword in description_lower for keyword in keywords)
+
+    if main_lower == "thunderstorm" or contains("гроза", "thunder"):
+        return "⛈️"
+    if main_lower == "drizzle" or contains("морось", "drizzle"):
+        return "🌦️"
+    if main_lower == "rain" or contains("дожд", "ливень", "rain"):
+        return "🌧️"
+    if main_lower == "snow" or contains("снег", "snow"):
+        return "❄️"
+    if main_lower == "clear" or contains("ясно", "clear"):
+        return "☀️"
+    if contains("пасмур", "overcast"):
+        return "☁️"
+    if main_lower == "clouds" or contains("облач", "cloud"):
+        return "🌥️"
+    if main_lower in {"mist", "smoke", "haze"} or contains("туман", "дымка", "smog", "haze", "fog"):
+        return "🌫️"
+    if main_lower in {"dust", "sand", "ash"} or contains("пыль", "песок", "дым"):
+        return "🏜️"
+    if main_lower == "squall" or contains("шквал", "порыв"):
+        return "🌬️"
+    if main_lower == "tornado" or contains("торнадо"):
+        return "🌪️"
+
+    return "🌈"
 
 def _ensure_api_key():
     if not settings.openweather_api_key:
@@ -157,7 +189,9 @@ def _format_date(day: date) -> str:
 
 def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
     date_str = _format_date(day.get("date")) if day.get("date") else ""
-    description = day.get("description", "нет данных").capitalize()
+    description = day.get("description", "нет данных")
+    icon = _get_weather_icon(description=description)
+    description_with_icon = f"{icon} {description.capitalize()}" if description else icon
     temp_min = day.get("temp_min")
     temp_max = day.get("temp_max")
     temp_avg = day.get("temp_avg")
@@ -165,7 +199,7 @@ def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
     wind_speed = day.get("wind_speed_avg")
     humidity = day.get("humidity_avg")
 
-    parts = [f"{day_index}-й день ({date_str}): {description}"]
+    parts = [f"{day_index}-й день ({date_str}): {description_with_icon}"]
 
     if temp_max is not None and temp_min is not None:
         parts.append(f"Диапазон: <b>{temp_min:.1f}°C</b> … <b>{temp_max:.1f}°C</b>")
@@ -200,10 +234,11 @@ def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     feels = main.get("feels_like")
     humidity = main.get("humidity")
     description = weather_list[0]["description"] if weather_list else "нет данных"
+    main_condition = weather_list[0].get("main") if weather_list else None
     wind_speed = wind.get("speed")
-
+    icon = _get_weather_icon(main_condition, description)
     parts = [
-        f"Погода в городе <b>{city}</b> 🌤",
+        f"{icon} Погода в городе <b>{city}</b>",
         "",
         f"{description.capitalize()}",
     ]
