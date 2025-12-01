@@ -1,5 +1,6 @@
 import pytest
 import httpx
+from datetime import date
 from unittest.mock import patch
 
 from app import weather_client

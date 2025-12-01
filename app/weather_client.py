@@ -108,11 +108,15 @@ def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dic
     ]
     wind_speeds = [item.get("wind", {}).get("speed") for item in entries if item.get("wind")]
     descriptions: List[str] = []
+    mains: List[str] = []
     for item in entries:
         for weather in item.get("weather", []):
             desc = weather.get("description")
             if desc:
                 descriptions.append(desc)
+            main = weather.get("main")
+            if main:
+                mains.append(main)
 
     dt = datetime.fromtimestamp(entries[0]["dt"] + timezone_offset, tz=timezone.utc)
 
@@ -130,6 +134,7 @@ def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dic
         "feels_like_avg": _safe_avg(feels_like),
         "wind_speed_avg": _safe_avg(wind_speeds),
         "humidity_avg": _safe_avg(humidity),
+        "main": Counter(mains).most_common(1)[0][0] if mains else None,
         "description": Counter(descriptions).most_common(1)[0][0]
         if descriptions
         else "нет данных",
@@ -190,7 +195,8 @@ def _format_date(day: date) -> str:
 def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
     date_str = _format_date(day.get("date")) if day.get("date") else ""
     description = day.get("description", "нет данных")
-    icon = _get_weather_icon(description=description)
+    main_condition = day.get("main")
+    icon = _get_weather_icon(main_condition, description)
     description_with_icon = f"{icon} {description.capitalize()}" if description else icon
     temp_min = day.get("temp_min")
     temp_max = day.get("temp_max")
