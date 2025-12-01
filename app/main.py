@@ -418,6 +418,25 @@ async def ask_notification_time(message: Message, state: FSMContext):
         parse_mode="HTML",
     )
 
+async def process_notification_time(message: Message, state: FSMContext):
+    time_input = message.text.strip()
+    normalized_time = normalize_time_input(time_input)
+
+    if normalized_time is None:
+        await message.answer(
+            "Не удалось распознать время. Используйте формат ЧЧ:ММ, например 08:30.",
+            reply_markup=main_menu_keyboard(),
+        )
+        await state.clear()
+        return
+
+    user = await _ensure_user_with_city(message)
+
+    if user is None:
+        await state.clear()
+        return
+
+
 
 
 
