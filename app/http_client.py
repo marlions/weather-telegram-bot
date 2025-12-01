@@ -15,3 +15,13 @@ class HTTPClient:
                     cls._session = aiohttp.ClientSession(connector=connector)
         return cls._session
 
+    @classmethod
+    async def fetch_json(cls, url: str, params: dict = None, timeout: int = 10):
+        session = await cls.get_session()
+        try:
+            async with session.get(url, params=params, timeout=timeout) as resp:
+                resp.raise_for_status()
+                return await resp.json()
+        except Exception:
+            # пробрасываем — вызывающий код решит как обрабатывать
+            raise
