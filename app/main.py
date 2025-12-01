@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from datetime import datetime
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
@@ -8,7 +9,7 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
-from sqlalchemy import select
+from sqlalchemy import select, func
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from .config import settings
@@ -38,6 +39,8 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+DEFAULT_NOTIFICATION_TIME = "06:00"
 
 class CityForm(StatesGroup):
     waiting_for_city = State()
