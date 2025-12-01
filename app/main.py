@@ -499,6 +499,22 @@ async def process_notification_choice(message: Message, state: FSMContext):
         )
         return
 
+    normalized_time = preset_times[choice]
+
+    async with async_session_maker() as session:
+        db_user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+
+        if db_user is None:
+            await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
+            await state.clear()
+            return
+
+        subscription = await session.scalar(
+            select(Subscription).where(Subscription.user_id == db_user.id)
+        )
+
 async def send_daily_weather(bot: Bot, current_time: str | None = None):
     try:
         target_time = current_time or datetime.utcnow().strftime("%H:%M")
