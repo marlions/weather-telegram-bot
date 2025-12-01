@@ -47,6 +47,7 @@ class CityForm(StatesGroup):
 class ForecastForm(StatesGroup):
     waiting_for_day = State()
 class NotificationTimeForm(StatesGroup):
+    waiting_for_time_choice = State()
     waiting_for_time = State()
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
@@ -58,10 +59,27 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="Подписаться на прогноз"),
                 KeyboardButton(text="Отписаться от прогноза"),
             ],
-            [KeyboardButton(text="Время уведомлений")],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие…",
+    )
+
+def notification_time_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="Ночью"),
+                KeyboardButton(text="Утром"),
+            ],
+            [
+                KeyboardButton(text="Днём"),
+                KeyboardButton(text="Вечером"),
+            ],
+            [KeyboardButton(text="Своё время")],
+            [KeyboardButton(text="⬅️ Назад")],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите время получения уведомлений",
     )
 
 def forecast_day_keyboard() -> ReplyKeyboardMarkup:
