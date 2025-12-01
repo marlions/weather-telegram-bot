@@ -515,6 +515,35 @@ async def process_notification_choice(message: Message, state: FSMContext):
             select(Subscription).where(Subscription.user_id == db_user.id)
         )
 
+        if subscription is None:
+            subscription = Subscription(
+                user_id=db_user.id,
+                city=db_user.city or "",
+                daily_notifications=True,
+                notification_time=normalized_time,
+            )
+            session.add(subscription)
+        else:
+            subscription.notification_time = normalized_time
+            subscription.daily_notifications = True
+            if db_user.city:
+                subscription.city = db_user.city
+
+        db_user.subscribed = True
+        await session.commit()
+
+    await state.clear()
+    await message.answer(
+        f"Вы подписались на ежедневный прогноз для города: <b>{db_user.city}</b> 🌤\n"
+        f"Время уведомлений: <b>{normalized_time}</b> (UTC)",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
+    )
+
+    logger.info(
+        f"User {message.from_user.id} subscribed to daily weather updates for {db_user.city} at {normalized_time}"
+    )
+
 async def send_daily_weather(bot: Bot, current_time: str | None = None):
     try:
         target_time = current_time or datetime.utcnow().strftime("%H:%M")
