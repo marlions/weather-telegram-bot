@@ -111,3 +111,39 @@ def test_format_weather_message_html_tags():
     assert "Ощущается как: <b>10.1°C</b>" in result
     assert "Влажность: 55%" in result
     assert "Ветер: 3.2 м/с" in result
+
+def test_aggregate_daily_preserves_main_condition():
+    entries = [
+        {
+            "dt": 1,
+            "main": {"temp": 5.0, "temp_min": 4.0, "temp_max": 6.0},
+            "weather": [
+                {"description": "легкий снег", "main": "Snow"},
+                {"description": "легкий снег", "main": "Snow"},
+            ],
+        },
+        {
+            "dt": 2,
+            "main": {"temp": 4.5, "temp_min": 3.5, "temp_max": 5.5},
+            "weather": [{"description": "дождь", "main": "Rain"}],
+        },
+    ]
+
+    aggregated = weather_client._aggregate_daily(entries, timezone_offset=0)
+
+    assert aggregated["main"] == "Snow"
+    assert aggregated["description"] == "легкий снег"
+
+
+def test_weekly_forecast_uses_main_for_icons():
+    daily = [
+        {
+            "date": date(2024, 1, 1),
+            "main": "Snow",
+            "description": "непонятная погода",
+        }
+    ]
+
+    result = weather_client.format_weekly_forecast("Новосибирск", daily, 0)
+
+    assert "❄️" in result
