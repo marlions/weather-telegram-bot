@@ -436,14 +436,51 @@ async def process_notification_time(message: Message, state: FSMContext):
         await state.clear()
         return
 
+    async with async_session_maker() as session:
+        db_user = await session.scalar(select(User).where(User.telegram_id == user.telegram_id))
 
+        if db_user is None:
+            await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
+            await state.clear()
+            return
 
+        subscription = await session.scalar(
+            select(Subscription).where(Subscription.user_id == db_user.id)
+        )
 
+        if subscription is None:
+            subscription = Subscription(
+                user_id=db_user.id,
+                city=db_user.city or "",
+                daily_notifications=db_user.subscribed,
+                notification_time=normalized_time,
+            )
+            session.add(subscription)
+        else:
+            subscription.notification_time = normalized_time
+            if db_user.city:
+                subscription.city = db_user.city
 
+        await session.commit()
 
+    await state.clear()
 
+    if subscription.daily_notifications:
+        text = (
+            f"Буду присылать ежедневные уведомления в <b>{normalized_time}</b> (UTC)."
+        )
+    else:
+        text = (
+            f"Время уведомлений сохранено: <b>{normalized_time}</b>. "
+            "Подпишитесь на прогноз, чтобы получать сообщения."
+        )
+
+    await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
+
+async def send_daily_weather(bot: Bot, current_time: str | None = None):
     try:
-        logger.info("Starting daily weather broadcast")
+        target_time = current_time or datetime.utcnow().strftime("%H:%M")
+        logger.info(f"Starting daily weather broadcast for {target_time}")
         async with async_session_maker() as session:
             result = await session.execute(
                 select(User, Subscription)
