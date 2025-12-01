@@ -27,15 +27,14 @@ from .alerts import check_extreme_weather
 if not os.path.exists("logs"):
     os.makedirs("logs")
 
-log_path = os.path.join(os.getcwd(), 'logs', 'app.log')
+log_path = os.path.join(os.getcwd(), "logs", "app.log")
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("logs/app.log"),
-        logging.FileHandler(log_path)
+        logging.FileHandler(log_path),
     ]
 )
 logger = logging.getLogger(__name__)
@@ -317,9 +316,9 @@ async def set_notification_time_handler(message: Message, state: FSMContext):
     await state.clear()
 
 
-async def cmd_set_city(message: Message, new_city=None):
+async def cmd_set_city(message: Message):
     try:
-        logger.info(f"Setting city for user {message.from_user.id}: {new_city}")
+        logger.info(f"Setting city for user {message.from_user.id}")
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2:
             await message.answer("Использование: /set_city <город>\nНапример: /set_city Санкт-Петербург")
@@ -706,9 +705,6 @@ async def cmd_help(message: Message):
     """
     await message.answer(help_text)
 
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-
 def setup_handlers(dp: Dispatcher):
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(cmd_set_city, Command(commands=["set_city"]))
@@ -736,8 +732,6 @@ def setup_handlers(dp: Dispatcher):
     )
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
-
     if not settings.telegram_bot_token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN не задан в переменных окружения")
 
