@@ -176,6 +176,7 @@ async def cmd_start(message: Message):
                 "• Прогноз на выбранный день\n"
                 "• Погода на 5 дней\n"
                 "• Сменить город\n"
+                "• Настроить время уведомлений\n"
                 "• Подписаться на прогноз\n"
                 "• Отписаться от прогноза",
                 reply_markup=main_menu_keyboard(),
@@ -362,11 +363,14 @@ async def subscribe_daily(message: Message):
                 user_id=user.id,
                 city=user.city,
                 daily_notifications=True,
+                notification_time=DEFAULT_NOTIFICATION_TIME,
             )
             session.add(sub)
         else:
             sub.city = user.city
             sub.daily_notifications = True
+            if not sub.notification_time:
+                sub.notification_time = DEFAULT_NOTIFICATION_TIME
 
         user.subscribed = True
         await session.commit()
@@ -402,7 +406,23 @@ async def unsubscribe_daily(message: Message):
 
     await message.answer("Вы отписались от ежедневных уведомлений о погоде.")
 
-async def send_daily_weather(bot: Bot):
+async def ask_notification_time(message: Message, state: FSMContext):
+    user = await _ensure_user_with_city(message)
+
+    if user is None:
+        return
+
+    await state.set_state(NotificationTimeForm.waiting_for_time)
+    await message.answer(
+        "Введите время для ежедневных уведомлений в формате <b>ЧЧ:ММ</b> (UTC).",
+        parse_mode="HTML",
+    )
+
+
+
+
+
+
     try:
         logger.info("Starting daily weather broadcast")
         async with async_session_maker() as session:
