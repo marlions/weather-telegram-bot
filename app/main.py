@@ -482,7 +482,8 @@ async def process_notification_time(message: Message, state: FSMContext):
         )
         return
 
-    await save_notification_time(message, normalized_time)
+    async with async_session_maker() as session:
+        await save_notification_time(session, message.from_user.id, normalized_time)
 
     await state.clear()
     await message.answer(
@@ -540,6 +541,7 @@ async def process_notification_time(message: Message, state: FSMContext):
 
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
 
+
 async def process_notification_choice(message: Message, state: FSMContext):
     user = await _ensure_user_with_city(message)
 
@@ -572,7 +574,9 @@ async def process_notification_choice(message: Message, state: FSMContext):
         return
 
     normalized_time = preset_times[choice]
-    await save_notification_time(message, user.id, normalized_time)
+
+    async with async_session_maker() as session:
+        await save_notification_time(session, user.id, normalized_time)
 
     await message.answer(
         f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤\n"
@@ -623,6 +627,7 @@ async def process_notification_choice(message: Message, state: FSMContext):
     logger.info(
         f"User {message.from_user.id} subscribed to daily weather updates for {db_user.city} at {normalized_time}"
     )
+
 
 async def send_daily_weather(bot: Bot, current_time: str | None = None):
     try:
