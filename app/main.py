@@ -474,6 +474,15 @@ async def process_notification_time(message: Message, state: FSMContext):
 
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
 
+async def process_notification_choice(message: Message, state: FSMContext):
+    choice = message.text.strip()
+    preset_times = {
+        "Ночью": "00:30",
+        "Утром": "06:00",
+        "Днём": "12:00",
+        "Вечером": "18:00",
+    }
+
 async def send_daily_weather(bot: Bot, current_time: str | None = None):
     try:
         target_time = current_time or datetime.utcnow().strftime("%H:%M")
