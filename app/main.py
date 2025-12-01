@@ -630,10 +630,16 @@ async def process_notification_choice(message: Message, state: FSMContext):
     )
 
 
-async def send_daily_weather(bot: Bot, http_client: httpx.AsyncClient, current_time: str | None = None):
+async def send_daily_weather(bot, http_client: httpx.AsyncClient | None = None, current_time=DEFAULT_NOTIFICATION_TIME):
+    created_client = False
+    if http_client is None:
+        http_client = httpx.AsyncClient()
+        created_client = True
+
     try:
         target_time = current_time or datetime.utcnow().strftime("%H:%M")
         logger.info(f"Starting daily weather broadcast for {target_time}")
+
         async with async_session_maker() as session:
             result = await session.execute(
                 select(User, Subscription)
@@ -656,10 +662,10 @@ async def send_daily_weather(bot: Bot, http_client: httpx.AsyncClient, current_t
             ]
 
             if not filtered_rows:
+                logger.info("No users for this notification time.")
                 return
 
         users_by_city: dict[str, list[int]] = {}
-
         for user, sub in filtered_rows:
             city = user.city or sub.city
             if not city:
@@ -668,7 +674,11 @@ async def send_daily_weather(bot: Bot, http_client: httpx.AsyncClient, current_t
 
         for city, chat_ids in users_by_city.items():
             try:
-                data = await get_current_weather(city)
+                try:
+                    data = await get_current_weather(city, http_client)
+                except TypeError:
+                    data = await get_current_weather(city)
+
                 daily_text = "Ежедневный прогноз 🌤\n\n" + format_weather_message(city, data)
                 alert_text = check_extreme_weather(data)
             except Exception as e:
@@ -687,9 +697,12 @@ async def send_daily_weather(bot: Bot, http_client: httpx.AsyncClient, current_t
                         await bot.send_message(chat_id, alert_text, parse_mode="HTML")
                     except Exception as e:
                         logger.exception(f"Не удалось отправить экстренное предупреждение пользователю {chat_id}: {e}")
+
         logger.info("Daily weather broadcast succeeded")
-    except Exception as e:
-        logger.exception(f"Error in daily weather broadcast: {e}")
+    finally:
+        if created_client:
+            await http_client.aclose()
+
 
 async def cmd_help(message: Message):
     help_text = """
