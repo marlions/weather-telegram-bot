@@ -280,8 +280,7 @@ async def process_forecast_day(message: Message, state: FSMContext):
 
 async def set_notification_time_handler(message: Message, state: FSMContext):
     user = await _ensure_user_with_city(message)
-
-    if user is None or not user.city:
+    if user is None:
         return
 
     notification_time = message.text.strip()
@@ -293,17 +292,30 @@ async def set_notification_time_handler(message: Message, state: FSMContext):
         )
         return
 
-    try:
-        await save_notification_time(message, user.id, notification_time)
+    normalized = normalize_time_input(notification_time)
+    if normalized is None:
         await message.answer(
-            f"Время уведомлений для города {user.city} установлено на: <b>{notification_time}</b>",
-            parse_mode="HTML",
-            reply_markup=main_menu_keyboard(),
+            "Неверный формат времени. Используйте формат ЧЧ:ММ, например 08:30.",
+            reply_markup=notification_time_keyboard(),
         )
-        await state.clear()
+        return
+
+    try:
+        async with async_session_maker() as session:
+            await save_notification_time(session, user.id, normalized)
     except Exception as e:
-        await message.answer(f"Произошла ошибка: {e}. Попробуйте снова.")
+        logger.exception(f"Error saving notification time for user {user.id}: {e}")
+        await message.answer("Не удалось сохранить время уведомлений. Попробуйте ещё раз.")
         await state.clear()
+        return
+
+    await message.answer(
+        f"Время уведомлений для города {user.city} установлено на: <b>{normalized}</b>",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
+    )
+    await state.clear()
+
 
 async def cmd_set_city(message: Message, new_city=None):
     try:
@@ -491,34 +503,22 @@ async def process_notification_time(message: Message, state: FSMContext):
         return
 
     async with async_session_maker() as session:
-        await save_notification_time(session, message.from_user.id, normalized_time)
-
-    await state.clear()
-    await message.answer(
-        f"Время уведомлений сохранено: <b>{normalized_time}</b>. "
-        "Подпишитесь на прогноз, чтобы получать сообщения.",
-        parse_mode="HTML",
-        reply_markup=main_menu_keyboard(),
-    )
-
-    user = await _ensure_user_with_city(message)
-
-    if user is None:
-        await state.clear()
-        return
-
-    async with async_session_maker() as session:
-        db_user = await session.scalar(select(User).where(User.telegram_id == user.telegram_id))
+        db_user = await session.scalar(select(User).where(User.telegram_id == message.from_user.id))
 
         if db_user is None:
             await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
             await state.clear()
             return
 
-        subscription = await session.scalar(
-            select(Subscription).where(Subscription.user_id == db_user.id)
-        )
+        try:
+            await save_notification_time(session, db_user.id, normalized_time)
+        except Exception as e:
+            logger.exception(f"Error saving notification time for user {db_user.id}: {e}")
+            await message.answer("Ошибка при сохранении времени. Попробуйте снова.")
+            await state.clear()
+            return
 
+        subscription = await session.scalar(select(Subscription).where(Subscription.user_id == db_user.id))
         if subscription is None:
             subscription = Subscription(
                 user_id=db_user.id,
@@ -532,15 +532,14 @@ async def process_notification_time(message: Message, state: FSMContext):
             subscription.daily_notifications = True
             if db_user.city:
                 subscription.city = db_user.city
+
         db_user.subscribed = True
         await session.commit()
 
     await state.clear()
 
     if subscription.daily_notifications:
-        text = (
-            f"Буду присылать ежедневные уведомления в <b>{normalized_time}</b> (UTC)."
-        )
+        text = f"Буду присылать ежедневные уведомления в <b>{normalized_time}</b> (UTC)."
     else:
         text = (
             f"Время уведомлений сохранено: <b>{normalized_time}</b>. "
@@ -548,6 +547,7 @@ async def process_notification_time(message: Message, state: FSMContext):
         )
 
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
+
 
 
 async def process_notification_choice(message: Message, state: FSMContext):
