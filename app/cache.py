@@ -4,3 +4,20 @@ import asyncio
 from typing import Any
 
 REDIS_URL = os.getenv("REDIS_URL")
+
+class InMemoryTTLCache:
+    def __init__(self):
+        self._store = {}  # key -> (ts, ttl, value)
+        self._lock = asyncio.Lock()
+
+    async def get(self, key: str):
+        async with self._lock:
+            item = self._store.get(key)
+            if not item:
+                return None
+            ts, ttl, value = item
+            import time
+            if time.time() - ts > ttl:
+                del self._store[key]
+                return None
+            return value
