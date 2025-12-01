@@ -153,4 +153,21 @@ async def test_send_daily_weather_uses_notification_time(monkeypatch):
         notification_time="09:15",
     )
 
-    assert bot.messages == [], "Сообщения не должны отправляться после отписки"
+    async def fake_get_current_weather(city: str):
+        return {}
+
+    def fake_format_weather_message(city: str, data: dict):
+        return f"Погода для {city}"
+
+    monkeypatch.setattr(main_module, "get_current_weather", fake_get_current_weather)
+    monkeypatch.setattr(main_module, "format_weather_message", fake_format_weather_message)
+    monkeypatch.setattr(main_module, "select", lambda *models: FakeSelect(*models))
+    monkeypatch.setattr(main_module, "async_session_maker", FakeSessionMaker(user, subscription))
+
+    bot = FakeBot()
+
+    await main_module.send_daily_weather(bot, current_time="08:00")
+    assert bot.messages == []
+
+    await main_module.send_daily_weather(bot, current_time="09:15")
+    assert bot.messages, "Сообщения должны отправляться в сохранённое время"
