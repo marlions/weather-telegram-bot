@@ -278,6 +278,33 @@ async def process_forecast_day(message: Message, state: FSMContext):
     finally:
         await state.clear()
 
+async def set_notification_time_handler(message: Message, state: FSMContext):
+    user = await _ensure_user_with_city(message)
+
+    if user is None or not user.city:
+        return
+
+    notification_time = message.text.strip()
+
+    if not notification_time:
+        await message.answer(
+            "Пожалуйста, введите время в формате ЧЧ:ММ.",
+            reply_markup=notification_time_keyboard(),
+        )
+        return
+
+    try:
+        await save_notification_time(message, user.id, notification_time)
+        await message.answer(
+            f"Время уведомлений для города {user.city} установлено на: <b>{notification_time}</b>",
+            parse_mode="HTML",
+            reply_markup=main_menu_keyboard(),
+        )
+        await state.clear()
+    except Exception as e:
+        await message.answer(f"Произошла ошибка: {e}. Попробуйте снова.")
+        await state.clear()
+
 async def cmd_set_city(message: Message, new_city=None):
     try:
         logger.info(f"Setting city for user {message.from_user.id}: {new_city}")
@@ -419,32 +446,21 @@ async def ask_notification_time(message: Message, state: FSMContext):
         ),
     )
 
-async def save_notification_time(message: Message, time: str, city: str):
-    async with async_session_maker() as session:
-        db_user = await session.scalar(select(User).where(User.telegram_id == message.from_user.id))
-        if db_user is None:
-            await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
-            return
-
-        subscription = await session.scalar(
-            select(Subscription).where(Subscription.user_id == db_user.id)
+async def save_notification_time(session, user_id: int, notification_time: str):
+    normalized_time = notification_time.strip()
+    subscription = await session.scalar(
+        select(Subscription).where(Subscription.user_id == user_id)
+    )
+    if subscription:
+        subscription.notification_time = normalized_time
+    else:
+        subscription = Subscription(
+            user_id=user_id,
+            notification_time=normalized_time,
+            daily_notifications=True
         )
-
-        if subscription is None:
-            subscription = Subscription(
-                user_id=db_user.id,
-                city=city,  # Используем город из базы данных
-                daily_notifications=True,
-                notification_time=time,
-            )
-            session.add(subscription)
-        else:
-            subscription.notification_time = time
-            subscription.daily_notifications = True
-
-        db_user.subscribed = True
-        await session.commit()
-
+        session.add(subscription)
+    await session.commit()
 
 async def process_notification_time(message: Message, state: FSMContext):
     time_input = message.text.strip()
@@ -525,6 +541,12 @@ async def process_notification_time(message: Message, state: FSMContext):
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
 
 async def process_notification_choice(message: Message, state: FSMContext):
+    user = await _ensure_user_with_city(message)
+
+    if not user or not user.city:
+        await message.answer("Не удалось найти ваш город. Пожалуйста, настройте город.",
+                             reply_markup=main_menu_keyboard())
+        return
     choice = message.text.strip()
     preset_times = {
         "Ночью": "00:30",
@@ -550,24 +572,10 @@ async def process_notification_choice(message: Message, state: FSMContext):
         return
 
     normalized_time = preset_times[choice]
-
-    async with async_session_maker() as session:
-        db_user = await session.scalar(select(User).where(User.telegram_id == message.from_user.id))
-        if db_user is None:
-            await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
-            return
-
-        city = db_user.city  # Получаем город из данных пользователя
-
-    if not city:
-        await message.answer("Город не указан. Пожалуйста, укажите свой город с помощью команды /start.")
-        return
-
-    # Сохраняем выбранное время уведомлений
-    await save_notification_time(message, normalized_time, city)
+    await save_notification_time(message, user.id, normalized_time)
 
     await message.answer(
-        f"Вы подписались на ежедневный прогноз для города: <b>{city}</b> 🌤\n"
+        f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤\n"
         f"Время уведомлений: <b>{normalized_time}</b> (UTC)",
         parse_mode="HTML",
         reply_markup=main_menu_keyboard(),
@@ -628,7 +636,8 @@ async def send_daily_weather(bot: Bot, current_time: str | None = None):
                     Subscription.daily_notifications == True,
                     User.city.isnot(None),
                     func.coalesce(
-                        Subscription.notification_time, DEFAULT_NOTIFICATION_TIME
+                        Subscription.notification_time.cast(func.VARCHAR),
+                        DEFAULT_NOTIFICATION_TIME
                     )
                     == target_time,
                 )
