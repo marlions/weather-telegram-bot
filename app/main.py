@@ -488,12 +488,22 @@ async def send_daily_weather(bot: Bot, current_time: str | None = None):
                 .where(
                     Subscription.daily_notifications == True,
                     User.city.isnot(None),
+                    func.coalesce(
+                        Subscription.notification_time, DEFAULT_NOTIFICATION_TIME
+                    )
+                    == target_time,
                 )
             )
             rows = result.all()
 
-        if not rows:
-            return
+            filtered_rows = [
+                (user, sub)
+                for user, sub in rows
+                if (sub.notification_time or DEFAULT_NOTIFICATION_TIME) == target_time
+            ]
+
+            if not filtered_rows:
+                return
 
         users_by_city: dict[str, list[int]] = {}
 
