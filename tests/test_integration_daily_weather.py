@@ -1,6 +1,6 @@
 import pytest
 from app.models import User, Subscription
-from app.main import send_daily_weather
+from app.main import DEFAULT_NOTIFICATION_TIME, send_daily_weather
 
 class FakeBot:
     def __init__(self):
@@ -74,7 +74,7 @@ async def test_daily_weather_flow(monkeypatch):
 
     fake_bot = FakeBot()
 
-    await send_daily_weather(fake_bot)
+    await send_daily_weather(fake_bot, current_time=DEFAULT_NOTIFICATION_TIME)
 
     msgs = [m for m in fake_bot.messages if m["chat_id"] == 123456]
     assert msgs, "Должны быть отправлены сообщения подписчику"
