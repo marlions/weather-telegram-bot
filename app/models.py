@@ -25,6 +25,7 @@ class Subscription(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     city = Column(String, nullable=False)
     daily_notifications = Column(Boolean, default=True)
+    notification_time = Column(String, nullable=True)
 
     user = relationship("User", back_populates="subscriptions")
 
