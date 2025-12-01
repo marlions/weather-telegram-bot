@@ -46,6 +46,8 @@ class CityForm(StatesGroup):
     waiting_for_city = State()
 class ForecastForm(StatesGroup):
     waiting_for_day = State()
+class NotificationTimeForm(StatesGroup):
+    waiting_for_time = State()
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -56,6 +58,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="Подписаться на прогноз"),
                 KeyboardButton(text="Отписаться от прогноза"),
             ],
+            [KeyboardButton(text="Время уведомлений")],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие…",
@@ -92,6 +95,14 @@ async def _ensure_user_with_city(message: Message) -> User | None:
         return None
 
     return user
+
+def normalize_time_input(raw_value: str) -> str | None:
+    try:
+        parsed = datetime.strptime(raw_value, "%H:%M")
+    except ValueError:
+        return None
+
+    return parsed.strftime("%H:%M")
 
 async def btn_current(message: Message):
     await cmd_current(message)
