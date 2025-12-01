@@ -23,5 +23,10 @@ class HTTPClient:
                 resp.raise_for_status()
                 return await resp.json()
         except Exception:
-            # пробрасываем — вызывающий код решит как обрабатывать
             raise
+
+    @classmethod
+    async def close(cls):
+        if cls._session and not cls._session.closed:
+            await cls._session.close()
+            cls._session = None
