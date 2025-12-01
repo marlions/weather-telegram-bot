@@ -1,44 +1,31 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, BigInteger
-from sqlalchemy.orm import relationship, declarative_base
-from sqlalchemy.sql import func
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
+
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(BigInteger, unique=True, index=True)
-    username = Column(String, nullable=True)
-    city = Column(String, nullable=True)
-    subscribed = Column(Boolean, default=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    telegram_id = Column(Integer, unique=True, nullable=False, index=True)
+    username = Column(String(256), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    def __repr__(self):
-        return (
-            f"<User(id={self.id}, telegram_id={self.telegram_id}, "
-            f"username={self.username}, city={self.city}, subscribed={self.subscribed})>"
-        )
+    subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
+
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_subscription_user"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    city = Column(String, nullable=True)
-    daily_notifications = Column(Boolean, default=True)
-    notification_time = Column(String, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    city = Column(String(256), nullable=False)
+    notification_time = Column(String(5), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="subscriptions")
-
-    def __repr__(self):
-        return (
-            f"<Subscription(id={self.id}, user_id={self.user_id}, "
-            f"city={self.city}, daily_notifications={self.daily_notifications}, "
-            f"notification_time={self.notification_time})>"
-        )
-
-User.subscriptions = relationship(
-    "Subscription",
-    order_by=Subscription.id,
-    back_populates="user",
-)

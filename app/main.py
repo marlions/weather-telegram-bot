@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime
 
+import httpx
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
@@ -629,7 +630,7 @@ async def process_notification_choice(message: Message, state: FSMContext):
     )
 
 
-async def send_daily_weather(bot: Bot, current_time: str | None = None):
+async def send_daily_weather(bot: Bot, http_client: httpx.AsyncClient, current_time: str | None = None):
     try:
         target_time = current_time or datetime.utcnow().strftime("%H:%M")
         logger.info(f"Starting daily weather broadcast for {target_time}")
@@ -739,26 +740,27 @@ async def main():
     dp = Dispatcher(storage=MemoryStorage())
 
     setup_handlers(dp)
-
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    scheduler = AsyncIOScheduler(timezone="UTC")
+    async with httpx.AsyncClient(timeout=10.0) as http_client:
+        scheduler = AsyncIOScheduler(timezone="UTC")
 
-    scheduler.add_job(
-        send_daily_weather,
-        "cron",
-        minute="*",
-        args=[bot],
-        id="daily_weather_job",
-        replace_existing=True,
-    )
-    scheduler.start()
+        # при добавлении job передаём client
+        scheduler.add_job(
+            send_daily_weather,
+            "cron",
+            minute="*",
+            args=[bot, http_client],
+            id="daily_weather_job",
+            replace_existing=True,
+        )
+        scheduler.start()
 
-    try:
-        await dp.start_polling(bot)
-    finally:
-        scheduler.shutdown()
+        try:
+            await dp.start_polling(bot)
+        finally:
+            scheduler.shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
