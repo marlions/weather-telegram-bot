@@ -137,6 +137,20 @@ async def test_unsubscribe_stops_notifications(monkeypatch):
     monkeypatch.setattr(main_module, "get_current_weather", fake_get_current_weather)
 
     bot = FakeBot()
-    await main_module.send_daily_weather(bot)
+    await main_module.send_daily_weather(
+        bot, current_time=main_module.DEFAULT_NOTIFICATION_TIME
+    )
+
+    assert bot.messages == [], "Сообщения не должны отправляться после отписки"
+
+@pytest.mark.asyncio
+async def test_send_daily_weather_uses_notification_time(monkeypatch):
+    user = User(id=3, telegram_id=300, username="timed", city="Казань", subscribed=True)
+    subscription = Subscription(
+        user_id=user.id,
+        city=user.city,
+        daily_notifications=True,
+        notification_time="09:15",
+    )
 
     assert bot.messages == [], "Сообщения не должны отправляться после отписки"
