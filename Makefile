@@ -1,7 +1,7 @@
 .PHONY: build up down logs ps shell test integration lint format migrate start stop clean help
 
 COMPOSE := docker-compose
-SERVICE := app
+SERVICE := bot
 
 # Построить образ (без кэша)
 build:
@@ -29,6 +29,7 @@ shell:
 
 # Запустить unit-тесты (в контейнере, с зависимостями из image)
 test:
+	$(COMPOSE) build --no-cache $(SERVICE)
 	$(COMPOSE) run --rm $(SERVICE) pytest -q
 
 # Запустить только интеграционные тесты (пример)
