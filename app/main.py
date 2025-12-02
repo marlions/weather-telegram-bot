@@ -514,6 +514,7 @@ async def process_notification_time(message: Message, state: FSMContext):
 
         try:
             await save_notification_time(session, db_user.id, normalized_time)
+            asyncio.create_task(send_daily_weather(message.bot, None, normalized_time))
         except Exception as e:
             logger.exception(f"Error saving notification time for user {db_user.id}: {e}")
             await message.answer("Ошибка при сохранении времени. Попробуйте снова.")
@@ -588,6 +589,7 @@ async def process_notification_choice(message: Message, state: FSMContext):
 
     async with async_session_maker() as session:
         await save_notification_time(session, user.id, normalized_time)
+        asyncio.create_task(send_daily_weather(message.bot, None, normalized_time))
 
     await message.answer(
         f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤\n"
