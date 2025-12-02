@@ -200,6 +200,12 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
         "appid": settings.openweather_api_key,
     }
 
+    cache_key = f"forecast:{city.strip().lower()}:{days}"
+
+    cached = await get_cached(cache_key)
+    if cached:
+        return cached
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             resp = await client.get("https://api.openweathermap.org/data/2.5/forecast", params=params)
@@ -233,7 +239,10 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
     sorted_dates = sorted(grouped.keys())
     aggregated = [_aggregate_daily(grouped[day], timezone_offset) for day in sorted_dates]
 
+    await set_cached(cache_key, (aggregated[:days], timezone_offset), ttl=300)
+
     return aggregated[:days], timezone_offset
+
 
 def _format_date(day: date) -> str:
     return day.strftime("%d %b")
