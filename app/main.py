@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime
+from typing import Optional
 
 import httpx
 from aiogram import Bot, Dispatcher, F
@@ -633,7 +634,7 @@ async def process_notification_choice(message: Message, state: FSMContext):
     )
 
 
-async def send_daily_weather(bot, http_client: httpx.AsyncClient | None = None, current_time: str | None = None):
+async def send_daily_weather(bot, http_client: httpx.AsyncClient | None = None, current_time: Optional[str] = None):
     created_client = False
     if http_client is None:
         http_client = httpx.AsyncClient()
