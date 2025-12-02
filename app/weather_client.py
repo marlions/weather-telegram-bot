@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone, timedelta
 from typing import Any, Dict, List, Tuple, Optional
 import httpx
 from .config import settings
+from .cache import get_cached, set_cached
 
 class WeatherClientError(Exception):
     pass
@@ -42,32 +43,72 @@ def _get_weather_icon(main: str | None = None, description: str | None = None) -
 def _ensure_api_key():
     if not settings.openweather_api_key:
         raise WeatherClientError("API-ключ OpenWeatherMap не настроен")
-async def get_current_weather(city: str, client: Optional[httpx.AsyncClient] = None) -> Dict[str, Any]:
+
+async def get_current_weather(
+    city: str,
+    client: Optional[httpx.AsyncClient] = None,
+    use_cache: bool = True,
+    ttl: int = 300,
+) -> Dict[str, Any]:
+
     _ensure_api_key()
+
+    city_key = city.strip().lower()
+    cache_key = f"current_weather:{city_key}"
+
+    if use_cache:
+        try:
+            cached = await get_cached(cache_key)
+        except Exception:
+            cached = None
+        if cached is not None:
+            return cached
+
     params = {
         "q": city,
         "appid": settings.openweather_api_key,
         "units": "metric",
         "lang": "ru",
     }
+
     if client is None:
         async with httpx.AsyncClient(timeout=10.0) as local_client:
             try:
-                resp = await local_client.get("https://api.openweathermap.org/data/2.5/weather", params=params)
+                resp = await local_client.get(
+                    "https://api.openweathermap.org/data/2.5/weather",
+                    params=params,
+                )
             except httpx.RequestError as e:
-                raise WeatherClientError(f"Ошибка сети при запросе погоды: {e}") from e
+                raise WeatherClientError(
+                    f"Ошибка сети при запросе погоды: {e}"
+                ) from e
     else:
         try:
-            resp = await client.get("https://api.openweathermap.org/data/2.5/weather", params=params)
+            resp = await client.get(
+                "https://api.openweathermap.org/data/2.5/weather",
+                params=params,
+            )
         except httpx.RequestError as e:
-            raise WeatherClientError(f"Ошибка сети при запросе погоды: {e}") from e
+            raise WeatherClientError(
+                f"Ошибка сети при запросе погоды: {e}"
+            ) from e
 
     if resp.status_code == 404:
         raise WeatherClientError("Город не найден, проверьте написание")
     if resp.status_code != 200:
-        raise WeatherClientError(f"Сервис погоды вернул ошибку: {resp.status_code} {resp.text}")
+        raise WeatherClientError(
+            f"Сервис погоды вернул ошибку: {resp.status_code} {resp.text}"
+        )
 
-    return resp.json()
+    data = resp.json()
+
+    if use_cache:
+        try:
+            await set_cached(cache_key, data, ttl=ttl)
+        except Exception:
+            pass
+
+    return data
 
 async def _get_city_coordinates(city: str) -> Tuple[float, float]:
     _ensure_api_key()
