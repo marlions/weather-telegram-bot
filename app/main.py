@@ -505,7 +505,9 @@ async def process_notification_time(message: Message, state: FSMContext):
         return
 
     async with async_session_maker() as session:
-        db_user = await session.scalar(select(User).where(User.telegram_id == message.from_user.id))
+        db_user = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
 
         if db_user is None:
             await message.answer("Сначала напишите /start, чтобы я вас запомнил.")
@@ -514,53 +516,35 @@ async def process_notification_time(message: Message, state: FSMContext):
 
         try:
             await save_notification_time(session, db_user.id, normalized_time)
-            asyncio.create_task(send_daily_weather(message.bot, None, normalized_time))
         except Exception as e:
-            logger.exception(f"Error saving notification time for user {db_user.id}: {e}")
+            logger.exception(
+                f"Error saving notification time for user {db_user.id}: {e}"
+            )
             await message.answer("Ошибка при сохранении времени. Попробуйте снова.")
             await state.clear()
             return
 
-        subscription = await session.scalar(select(Subscription).where(Subscription.user_id == db_user.id))
-        if subscription is None:
-            subscription = Subscription(
-                user_id=db_user.id,
-                city=db_user.city or "",
-                daily_notifications=True,
-                notification_time=normalized_time,
-            )
-            session.add(subscription)
-        else:
-            subscription.notification_time = normalized_time
-            subscription.daily_notifications = True
-            if db_user.city:
-                subscription.city = db_user.city
-
-        db_user.subscribed = True
-        await session.commit()
-        asyncio.create_task(send_daily_weather(message.bot, None, normalized_time))
-
     await state.clear()
 
-    if subscription.daily_notifications:
-        text = f"Буду присылать ежедневные уведомления в <b>{normalized_time}</b> (UTC)."
-    else:
-        text = (
-            f"Время уведомлений сохранено: <b>{normalized_time}</b>. "
-            "Подпишитесь на прогноз, чтобы получать сообщения."
-        )
+    await message.answer(
+        f"Буду присылать ежедневные уведомления в <b>{normalized_time}</b> (UTC).",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
+    )
 
-    await message.answer(text, parse_mode="HTML", reply_markup=main_menu_keyboard())
 
 
 
 async def process_notification_choice(message: Message, state: FSMContext):
     user = await _ensure_user_with_city(message)
 
-    if not user or not user.city:
-        await message.answer("Не удалось найти ваш город. Пожалуйста, настройте город.",
-                             reply_markup=main_menu_keyboard())
+    if user is None or not user.city:
+        await message.answer(
+            "Не удалось найти ваш город. Пожалуйста, настройте город.",
+            reply_markup=main_menu_keyboard(),
+        )
         return
+
     choice = message.text.strip()
     preset_times = {
         "Ночью": "00:30",
@@ -571,7 +555,9 @@ async def process_notification_choice(message: Message, state: FSMContext):
 
     if choice == "⬅️ Назад":
         await state.clear()
-        await message.answer("Возвращаюсь в главное меню.", reply_markup=main_menu_keyboard())
+        await message.answer(
+            "Возвращаюсь в главное меню.", reply_markup=main_menu_keyboard()
+        )
         return
 
     if choice == "Своё время":
@@ -588,17 +574,6 @@ async def process_notification_choice(message: Message, state: FSMContext):
     normalized_time = preset_times[choice]
 
     async with async_session_maker() as session:
-        await save_notification_time(session, user.id, normalized_time)
-        asyncio.create_task(send_daily_weather(message.bot, None, normalized_time))
-
-    await message.answer(
-        f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤\n"
-        f"Время уведомлений: <b>{normalized_time}</b> (UTC)",
-        parse_mode="HTML",
-        reply_markup=main_menu_keyboard(),
-    )
-
-    async with async_session_maker() as session:
         db_user = await session.scalar(
             select(User).where(User.telegram_id == message.from_user.id)
         )
@@ -608,32 +583,29 @@ async def process_notification_choice(message: Message, state: FSMContext):
             await state.clear()
             return
 
-        subscription = await session.scalar(
-            select(Subscription).where(Subscription.user_id == db_user.id)
-        )
-
-        if subscription is None:
-            subscription = Subscription(
-                user_id=db_user.id,
-                city=db_user.city or "",
-                daily_notifications=True,
-                notification_time=normalized_time,
+        try:
+            await save_notification_time(session, db_user.id, normalized_time)
+        except Exception as e:
+            logger.exception(
+                f"Error saving notification time for user {db_user.id}: {e}"
             )
-            session.add(subscription)
-        else:
-            subscription.notification_time = normalized_time
-            subscription.daily_notifications = True
-            if db_user.city:
-                subscription.city = db_user.city
-
-        db_user.subscribed = True
-        await session.commit()
-        asyncio.create_task(send_daily_weather(message.bot, None, normalized_time))
+            await message.answer(
+                "Не удалось сохранить время уведомлений. Попробуйте ещё раз."
+            )
+            await state.clear()
+            return
 
     await state.clear()
-    logger.info(
-        f"User {message.from_user.id} subscribed to daily weather updates for {db_user.city} at {normalized_time}"
+    await message.answer(
+        f"Вы подписались на ежедневный прогноз для города: <b>{user.city}</b> 🌤\n"
+        f"Время уведомлений: <b>{normalized_time}</b> (UTC)",
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard(),
     )
+    logger.info(
+        f"User {message.from_user.id} subscribed to daily weather updates for {user.city} at {normalized_time}"
+    )
+
 
 
 async def send_daily_weather(bot, http_client: httpx.AsyncClient | None = None, current_time: Optional[str] = None):
