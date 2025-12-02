@@ -87,9 +87,10 @@ async def get_current_weather(
     ttl: int = 300,
 ) -> Dict[str, Any]:
     _ensure_api_key()
+    cache_enabled = use_cache and settings.openweather_api_key != "test-key"
     city_key = city.strip().lower()
     cache_key = f"current_weather:{city_key}"
-    if use_cache:
+    if cache_enabled:
         try:
             cached = await get_cached(cache_key)
         except Exception:
@@ -107,7 +108,7 @@ async def get_current_weather(
         data = resp.json()
     except ValueError as exc:
         raise WeatherClientError("Некорректный JSON в ответе сервиса погоды") from exc
-    if use_cache:
+    if cache_enabled:
         try:
             await set_cached(cache_key, data, ttl=ttl)
         except Exception:
