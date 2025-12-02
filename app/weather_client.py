@@ -3,6 +3,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timezone, timedelta
 from typing import Any, Dict, List, Tuple, Optional, Union
 import httpx
+
 from .config import settings
 from .cache import get_cached, set_cached
 
@@ -45,7 +46,7 @@ def _get_weather_icon(main: str | None = None, description: str | None = None) -
 
 
 def _ensure_api_key():
-    if not settings.openweather_api_key:
+    if not getattr(settings, "openweather_api_key", None):
         raise WeatherClientError("API-ключ OpenWeatherMap не настроен")
 
 
@@ -65,8 +66,10 @@ async def _request_json(
                     resp = await c.get(url, params=params)
             else:
                 resp = await client.get(url, params=params)
+
         resp.raise_for_status()
         return resp
+
     except httpx.RequestError as e:
         raise WeatherClientError(f"Ошибка сети при запросе: {e}") from e
     except httpx.HTTPStatusError as exc:
@@ -154,12 +157,8 @@ def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dic
     temps = [item.get("main", {}).get("temp") for item in entries if item.get("main")]
     temp_mins = [item["main"].get("temp_min") for item in entries if item.get("main")]
     temp_maxs = [item["main"].get("temp_max") for item in entries if item.get("main")]
-    feels_like = [
-        item.get("main", {}).get("feels_like") for item in entries if item.get("main")
-    ]
-    humidity = [
-        item.get("main", {}).get("humidity") for item in entries if item.get("main")
-    ]
+    feels_like = [item.get("main", {}).get("feels_like") for item in entries if item.get("main")]
+    humidity = [item.get("main", {}).get("humidity") for item in entries if item.get("main")]
     wind_speeds = [item.get("wind", {}).get("speed") for item in entries if item.get("wind")]
     descriptions: List[str] = []
     mains: List[str] = []
@@ -189,9 +188,7 @@ def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dic
         "wind_speed_avg": _safe_avg(wind_speeds),
         "humidity_avg": _safe_avg(humidity),
         "main": Counter(mains).most_common(1)[0][0] if mains else None,
-        "description": Counter(descriptions).most_common(1)[0][0]
-        if descriptions
-        else "нет данных",
+        "description": Counter(descriptions).most_common(1)[0][0] if descriptions else "нет данных",
     }
 
 
@@ -275,10 +272,8 @@ def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
 
 def format_weekly_forecast(city: str, daily: List[Dict[str, Any]], timezone_offset: int) -> str:
     parts = [f"Погода на {len(daily)} дней в <b>{city}</b> 📅", ""]
-
     for index, day in enumerate(daily, start=1):
         parts.append(_format_daily_block(day, index))
-
     return "\n\n".join(parts)
 
 
