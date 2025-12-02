@@ -1,12 +1,15 @@
+from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import date, datetime, timezone, timedelta
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, Union
 import httpx
 from .config import settings
 from .cache import get_cached, set_cached
 
+
 class WeatherClientError(Exception):
     pass
+
 
 def _get_weather_icon(main: str | None = None, description: str | None = None) -> str:
     main_lower = main.lower() if main else ""
@@ -40,9 +43,42 @@ def _get_weather_icon(main: str | None = None, description: str | None = None) -
 
     return "🌈"
 
+
 def _ensure_api_key():
     if not settings.openweather_api_key:
         raise WeatherClientError("API-ключ OpenWeatherMap не настроен")
+
+
+async def _request_json(
+    url: str,
+    params: dict,
+    client: Optional[Union[httpx.AsyncClient, Any]] = None,
+    timeout: float = 10.0,
+) -> httpx.Response:
+    try:
+        if client is None:
+            async with httpx.AsyncClient(timeout=timeout) as local_client:
+                resp = await local_client.get(url, params=params)
+        else:
+            if hasattr(client, "__aenter__") and callable(getattr(client, "__aenter__")):
+                async with client as c:
+                    resp = await c.get(url, params=params)
+            else:
+                resp = await client.get(url, params=params)
+        resp.raise_for_status()
+        return resp
+    except httpx.RequestError as e:
+        raise WeatherClientError(f"Ошибка сети при запросе: {e}") from e
+    except httpx.HTTPStatusError as exc:
+        try:
+            body = exc.response.json()
+            msg = body.get("message") or body.get("error") or exc.response.text or f"HTTP {exc.response.status_code}"
+        except Exception:
+            msg = f"HTTP {exc.response.status_code}"
+        raise WeatherClientError(f"Сервис вернул ошибку: {msg}") from exc
+    except Exception as exc:
+        raise WeatherClientError(f"Неожиданная ошибка при запросе: {exc}") from exc
+
 
 async def get_current_weather(
     city: str,
@@ -50,7 +86,6 @@ async def get_current_weather(
     use_cache: bool = True,
     ttl: int = 300,
 ) -> Dict[str, Any]:
-
     _ensure_api_key()
 
     city_key = city.strip().lower()
@@ -71,36 +106,12 @@ async def get_current_weather(
         "lang": "ru",
     }
 
-    if client is None:
-        async with httpx.AsyncClient(timeout=10.0) as local_client:
-            try:
-                resp = await local_client.get(
-                    "https://api.openweathermap.org/data/2.5/weather",
-                    params=params,
-                )
-            except httpx.RequestError as e:
-                raise WeatherClientError(
-                    f"Ошибка сети при запросе погоды: {e}"
-                ) from e
-    else:
-        try:
-            resp = await client.get(
-                "https://api.openweathermap.org/data/2.5/weather",
-                params=params,
-            )
-        except httpx.RequestError as e:
-            raise WeatherClientError(
-                f"Ошибка сети при запросе погоды: {e}"
-            ) from e
+    resp = await _request_json("https://api.openweathermap.org/data/2.5/weather", params, client)
 
-    if resp.status_code == 404:
-        raise WeatherClientError("Город не найден, проверьте написание")
-    if resp.status_code != 200:
-        raise WeatherClientError(
-            f"Сервис погоды вернул ошибку: {resp.status_code} {resp.text}"
-        )
-
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError as exc:
+        raise WeatherClientError("Некорректный JSON в ответе сервиса погоды") from exc
 
     if use_cache:
         try:
@@ -110,7 +121,8 @@ async def get_current_weather(
 
     return data
 
-async def _get_city_coordinates(city: str) -> Tuple[float, float]:
+
+async def _get_city_coordinates(city: str, client: Optional[httpx.AsyncClient] = None) -> Tuple[float, float]:
     _ensure_api_key()
 
     params = {
@@ -119,18 +131,13 @@ async def _get_city_coordinates(city: str) -> Tuple[float, float]:
         "appid": settings.openweather_api_key,
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        try:
-            resp = await client.get("https://api.openweathermap.org/geo/1.0/direct", params=params)
-        except httpx.RequestError as e:
-            raise WeatherClientError(f"Ошибка сети при поиске города: {e}") from e
+    resp = await _request_json("https://api.openweathermap.org/geo/1.0/direct", params, client)
 
-    if resp.status_code != 200:
-        raise WeatherClientError(
-            f"Сервис геокодирования вернул ошибку: {resp.status_code} {resp.text}"
-        )
+    try:
+        data = resp.json()
+    except ValueError as exc:
+        raise WeatherClientError("Некорректный JSON в ответе геокодера") from exc
 
-    data = resp.json()
     if not data:
         raise WeatherClientError("Город не найден, попробуйте уточнить запрос")
 
@@ -141,6 +148,7 @@ async def _get_city_coordinates(city: str) -> Tuple[float, float]:
         raise WeatherClientError("Не удалось определить координаты города")
 
     return float(lat), float(lon)
+
 
 def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dict[str, Any]:
     temps = [item.get("main", {}).get("temp") for item in entries if item.get("main")]
@@ -186,11 +194,12 @@ def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dic
         else "нет данных",
     }
 
-async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]], int]:
+
+async def get_daily_forecast(city: str, days: int, client: Optional[httpx.AsyncClient] = None) -> Tuple[List[Dict[str, Any]], int]:
     if days < 1 or days > 5:
         raise ValueError("Количество дней должно быть в диапазоне 1-5")
 
-    lat, lon = await _get_city_coordinates(city)
+    lat, lon = await _get_city_coordinates(city, client)
 
     params = {
         "lat": lat,
@@ -206,25 +215,13 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
     if cached:
         return cached
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        try:
-            resp = await client.get("https://api.openweathermap.org/data/2.5/forecast", params=params)
-        except httpx.RequestError as e:
-            raise WeatherClientError(f"Ошибка сети при запросе прогноза: {e}") from e
+    resp = await _request_json("https://api.openweathermap.org/data/2.5/forecast", params, client)
 
-    if resp.status_code == 404:
-        raise WeatherClientError("Город не найден, проверьте написание")
-    if resp.status_code == 401:
-        raise WeatherClientError(
-            "API-ключ OpenWeatherMap недействителен."
-        )
+    try:
+        data = resp.json()
+    except ValueError as exc:
+        raise WeatherClientError("Некорректный JSON в ответе сервиса прогноза") from exc
 
-    if resp.status_code != 200:
-        raise WeatherClientError(
-            f"Сервис прогноза вернул ошибку: {resp.status_code} {resp.text}"
-        )
-
-    data = resp.json()
     forecast_list = data.get("list")
     if not forecast_list:
         raise WeatherClientError("Погодные данные недоступны для выбранного города")
@@ -246,6 +243,7 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
 
 def _format_date(day: date) -> str:
     return day.strftime("%d %b")
+
 
 def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
     date_str = _format_date(day.get("date")) if day.get("date") else ""
@@ -274,6 +272,7 @@ def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
         parts.append(f"Ветер: {wind_speed:.1f} м/с")
     return "\n".join(parts)
 
+
 def format_weekly_forecast(city: str, daily: List[Dict[str, Any]], timezone_offset: int) -> str:
     parts = [f"Погода на {len(daily)} дней в <b>{city}</b> 📅", ""]
 
@@ -282,9 +281,11 @@ def format_weekly_forecast(city: str, daily: List[Dict[str, Any]], timezone_offs
 
     return "\n\n".join(parts)
 
+
 def format_single_forecast(city: str, day: Dict[str, Any], timezone_offset: int, day_index: int) -> str:
     header = f"Прогноз на {day_index}-й день для <b>{city}</b> 📅"
     return "\n".join([header, "", _format_daily_block(day, day_index)])
+
 
 def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
