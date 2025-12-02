@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from typing import Any, Dict, List, Tuple, Optional
 import httpx
 from .config import settings
@@ -123,7 +123,7 @@ def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dic
             if main:
                 mains.append(main)
 
-    dt = datetime.fromtimestamp(entries[0]["dt"] + timezone_offset, tz=timezone.utc)
+    dt = datetime.fromtimestamp(entries[0]["dt"], tz=timezone.utc) + timedelta(seconds=timezone_offset)
 
     def _safe_avg(values: List[float]) -> float | None:
         filtered = [v for v in values if v is not None]
@@ -186,7 +186,7 @@ async def get_daily_forecast(city: str, days: int) -> Tuple[List[Dict[str, Any]]
     grouped: defaultdict[date, List[Dict[str, Any]]] = defaultdict(list)
 
     for item in forecast_list:
-        dt = datetime.fromtimestamp(item["dt"] + timezone_offset, tz=timezone.utc)
+        dt = datetime.fromtimestamp(item["dt"], tz=timezone.utc) + timedelta(seconds=timezone_offset)
         grouped[dt.date()].append(item)
 
     sorted_dates = sorted(grouped.keys())
