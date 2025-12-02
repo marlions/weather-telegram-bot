@@ -41,7 +41,6 @@ def _get_weather_icon(main: str | None = None, description: str | None = None) -
         return "🌬️"
     if main_lower == "tornado" or contains("торнадо"):
         return "🌪️"
-
     return "🌈"
 
 
@@ -66,10 +65,8 @@ async def _request_json(
                     resp = await c.get(url, params=params)
             else:
                 resp = await client.get(url, params=params)
-
         resp.raise_for_status()
         return resp
-
     except httpx.RequestError as e:
         raise WeatherClientError(f"Ошибка сети при запросе: {e}") from e
     except httpx.HTTPStatusError as exc:
@@ -90,10 +87,8 @@ async def get_current_weather(
     ttl: int = 300,
 ) -> Dict[str, Any]:
     _ensure_api_key()
-
     city_key = city.strip().lower()
     cache_key = f"current_weather:{city_key}"
-
     if use_cache:
         try:
             cached = await get_cached(cache_key)
@@ -101,55 +96,43 @@ async def get_current_weather(
             cached = None
         if cached is not None:
             return cached
-
     params = {
         "q": city,
         "appid": settings.openweather_api_key,
         "units": "metric",
         "lang": "ru",
     }
-
     resp = await _request_json("https://api.openweathermap.org/data/2.5/weather", params, client)
-
     try:
         data = resp.json()
     except ValueError as exc:
         raise WeatherClientError("Некорректный JSON в ответе сервиса погоды") from exc
-
     if use_cache:
         try:
             await set_cached(cache_key, data, ttl=ttl)
         except Exception:
             pass
-
     return data
 
 
 async def _get_city_coordinates(city: str, client: Optional[httpx.AsyncClient] = None) -> Tuple[float, float]:
     _ensure_api_key()
-
     params = {
         "q": city,
         "limit": 1,
         "appid": settings.openweather_api_key,
     }
-
     resp = await _request_json("https://api.openweathermap.org/geo/1.0/direct", params, client)
-
     try:
         data = resp.json()
     except ValueError as exc:
         raise WeatherClientError("Некорректный JSON в ответе геокодера") from exc
-
     if not data:
         raise WeatherClientError("Город не найден, попробуйте уточнить запрос")
-
     lat = data[0].get("lat")
     lon = data[0].get("lon")
-
     if lat is None or lon is None:
         raise WeatherClientError("Не удалось определить координаты города")
-
     return float(lat), float(lon)
 
 
@@ -170,15 +153,12 @@ def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dic
             main = weather.get("main")
             if main:
                 mains.append(main)
-
     dt = datetime.fromtimestamp(entries[0]["dt"], tz=timezone.utc) + timedelta(seconds=timezone_offset)
-
     def _safe_avg(values: List[float]) -> float | None:
         filtered = [v for v in values if v is not None]
         if not filtered:
             return None
         return sum(filtered) / len(filtered)
-
     return {
         "date": dt.date(),
         "temp_min": min(temp_mins) if temp_mins else None,
@@ -195,9 +175,7 @@ def _aggregate_daily(entries: List[Dict[str, Any]], timezone_offset: int) -> Dic
 async def get_daily_forecast(city: str, days: int, client: Optional[httpx.AsyncClient] = None) -> Tuple[List[Dict[str, Any]], int]:
     if days < 1 or days > 5:
         raise ValueError("Количество дней должно быть в диапазоне 1-5")
-
     lat, lon = await _get_city_coordinates(city, client)
-
     params = {
         "lat": lat,
         "lon": lon,
@@ -205,36 +183,26 @@ async def get_daily_forecast(city: str, days: int, client: Optional[httpx.AsyncC
         "lang": "ru",
         "appid": settings.openweather_api_key,
     }
-
     cache_key = f"forecast:{city.strip().lower()}:{days}"
-
     cached = await get_cached(cache_key)
     if cached:
         return cached
-
     resp = await _request_json("https://api.openweathermap.org/data/2.5/forecast", params, client)
-
     try:
         data = resp.json()
     except ValueError as exc:
         raise WeatherClientError("Некорректный JSON в ответе сервиса прогноза") from exc
-
     forecast_list = data.get("list")
     if not forecast_list:
         raise WeatherClientError("Погодные данные недоступны для выбранного города")
-
     timezone_offset = data.get("city", {}).get("timezone", 0)
     grouped: defaultdict[date, List[Dict[str, Any]]] = defaultdict(list)
-
     for item in forecast_list:
         dt = datetime.fromtimestamp(item["dt"], tz=timezone.utc) + timedelta(seconds=timezone_offset)
         grouped[dt.date()].append(item)
-
     sorted_dates = sorted(grouped.keys())
     aggregated = [_aggregate_daily(grouped[day], timezone_offset) for day in sorted_dates]
-
     await set_cached(cache_key, (aggregated[:days], timezone_offset), ttl=300)
-
     return aggregated[:days], timezone_offset
 
 
@@ -254,9 +222,7 @@ def _format_daily_block(day: Dict[str, Any], day_index: int) -> str:
     feels_like = day.get("feels_like_avg")
     wind_speed = day.get("wind_speed_avg")
     humidity = day.get("humidity_avg")
-
     parts = [f"{day_index}-й день ({date_str}): {description_with_icon}"]
-
     if temp_max is not None and temp_min is not None:
         parts.append(f"Диапазон: <b>{temp_min:.1f}°C</b> … <b>{temp_max:.1f}°C</b>")
     elif temp_avg is not None:
@@ -286,7 +252,6 @@ def format_weather_message(city: str, data: Dict[str, Any]) -> str:
     main = data.get("main", {})
     weather_list = data.get("weather", [])
     wind = data.get("wind", {})
-
     temp = main.get("temp")
     feels = main.get("feels_like")
     humidity = main.get("humidity")
@@ -299,7 +264,6 @@ def format_weather_message(city: str, data: Dict[str, Any]) -> str:
         "",
         f"{description.capitalize()}",
     ]
-
     if temp is not None:
         parts.append(f"Температура: <b>{temp:.1f}°C</b>")
     if feels is not None:
