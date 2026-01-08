@@ -1,0 +1,10 @@
+aiogram
+python-dotenv
+httpx
+SQLAlchemy
+asyncpg
+apscheduler
+aiohttp
+aioredis
+pytest
+pytest-asyncio
